@@ -11,6 +11,7 @@ from rich.table import Table
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task, openrouter_extra_for_mode
+from agent_efficiency_bench.harnesses.swe_bench import build_swe_bench_eval_command
 from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench_command
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
@@ -142,6 +143,17 @@ def terminal_bench_command(
 ) -> None:
     """Print the official Terminal-Bench/Harbor command for a task."""
     cmd = build_terminal_bench_command(task_id=task_id, model=model, output_dir=output_dir, agent=agent, dataset=dataset)
+    console.print(" ".join(cmd))
+
+
+@app.command("swe-bench-command")
+def swe_bench_command(
+    predictions_path: str = typer.Option(..., help="SWE-bench predictions JSONL path."),
+    run_id: str = typer.Option("aeb-smoke", help="SWE-bench run id."),
+    dataset_name: str = typer.Option("SWE-bench/SWE-bench_Lite", help="SWE-bench dataset name."),
+) -> None:
+    """Print the official SWE-bench evaluation command for predictions."""
+    cmd = build_swe_bench_eval_command(predictions_path=predictions_path, run_id=run_id, dataset_name=dataset_name)
     console.print(" ".join(cmd))
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+import time
 
 import typer
 from rich.console import Console
@@ -11,6 +12,7 @@ from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgen
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
+from agent_efficiency_bench.providers.openrouter import OpenRouterClient
 from agent_efficiency_bench.runner import BenchmarkRunner
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
@@ -77,6 +79,36 @@ def run_answer(
     runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir)
     results = runner.run_tasks(selected)
     console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
+
+
+@app.command("openrouter-smoke")
+def openrouter_smoke(
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+) -> None:
+    """Verify OpenRouter connectivity and token/cost telemetry with one tiny request."""
+    try:
+        client = OpenRouterClient()
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    started = time.perf_counter()
+    response = client.chat(
+        ModelConfig(model=model, max_completion_tokens=16),
+        [{"role": "user", "content": "Reply with exactly: ok"}],
+    )
+    latency = time.perf_counter() - started
+    if response.prompt_tokens <= 0 or response.completion_tokens <= 0:
+        raise typer.BadParameter("OpenRouter response did not include nonzero token usage")
+    table = Table(title="OpenRouter smoke result")
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("model", response.model)
+    table.add_row("generation_id", response.generation_id)
+    table.add_row("prompt_tokens", str(response.prompt_tokens))
+    table.add_row("completion_tokens", str(response.completion_tokens))
+    table.add_row("cost_usd", str(response.cost_usd))
+    table.add_row("latency_seconds", f"{latency:.3f}")
+    table.add_row("content", response.content)
+    console.print(table)
 
 
 if __name__ == "__main__":

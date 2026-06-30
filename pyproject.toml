@@ -1,0 +1,32 @@
+[project]
+name = "agent-efficiency-bench"
+version = "0.1.0"
+description = "Telemetry-first benchmark harness for agentic efficiency across public task datasets."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "datasets>=2.19.0",
+  "huggingface-hub>=0.23.0",
+  "pydantic>=2.7.0",
+  "pyyaml>=6.0.1",
+  "requests>=2.32.0",
+  "rich>=13.7.0",
+  "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2.0"]
+
+[project.scripts]
+aeb = "agent_efficiency_bench.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_efficiency_bench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

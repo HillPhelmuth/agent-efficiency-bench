@@ -1,0 +1,2 @@
+{"run_id":"demo-1","task_id":"assistantbench__0","agent":"demo-agent","model":"demo-model","success":true,"quality_score":0.85,"wall_clock_seconds":180,"input_tokens":22000,"output_tokens":1800,"estimated_usd":0.12,"num_llm_calls":6,"num_tool_calls":12}
+{"run_id":"demo-2","task_id":"swe_bench_lite__example","agent":"demo-agent","model":"demo-model","success":false,"quality_score":0.0,"wall_clock_seconds":900,"input_tokens":120000,"output_tokens":9000,"estimated_usd":1.8,"num_llm_calls":30,"num_tool_calls":80,"num_errors":3}

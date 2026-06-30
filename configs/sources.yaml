@@ -1,0 +1,24 @@
+# Small public subset definition for initial agentic efficiency benchmark.
+# Keep counts low so iteration is cheap; increase only for formal benchmark runs.
+sources:
+  - name: swe_bench_lite
+    type: huggingface
+    dataset_id: SWE-bench/SWE-bench_Lite
+    split: test
+    sample_size: 8
+    normalizer: swe_bench
+
+  - name: assistantbench_dev
+    type: huggingface_jsonl
+    dataset_id: AssistantBench/AssistantBench
+    url: https://huggingface.co/datasets/AssistantBench/AssistantBench/resolve/main/assistant_bench_v1.0_dev.jsonl
+    split: dev
+    sample_size: 8
+    normalizer: assistantbench
+
+  - name: terminal_bench_github
+    type: github_terminal_bench
+    repo: harbor-framework/terminal-bench
+    branch: main
+    sample_size: 8
+    normalizer: terminal_bench

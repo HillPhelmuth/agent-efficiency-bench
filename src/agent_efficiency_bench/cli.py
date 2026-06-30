@@ -7,13 +7,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
+from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
-from agent_efficiency_bench.schemas import BenchmarkTask, RunTelemetry
+from agent_efficiency_bench.runner import BenchmarkRunner
+from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
 
 app = typer.Typer(help="Agentic efficiency benchmark tooling.")
 console = Console()
+
+
+def select_tasks(tasks: list[BenchmarkTask], category: str | None = None, limit: int | None = None) -> list[BenchmarkTask]:
+    selected = [task for task in tasks if category is None or task.category == category]
+    return selected[:limit] if limit is not None else selected
 
 
 @app.command("build-subset")
@@ -51,6 +59,24 @@ def score_runs(path: str) -> None:
     runs = [RunTelemetry.model_validate(row) for row in read_jsonl(path)]
     summary = aggregate_runs(runs)
     console.print_json(summary.model_dump_json(exclude_none=True))
+
+
+@app.command("run-answer")
+def run_answer(
+    tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+    category: str | None = typer.Option(None, help="Optional task category filter."),
+    limit: int | None = typer.Option(None, help="Maximum tasks to run."),
+    output_dir: str = typer.Option("runs/smoke", help="Output directory for traces and JSONL results."),
+    max_completion_tokens: int = typer.Option(2048, help="Per-call max completion tokens."),
+) -> None:
+    """Run an answer-only OpenRouter baseline over normalized tasks."""
+    loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
+    selected = select_tasks(loaded_tasks, category=category, limit=limit)
+    agent = OpenRouterAnswerAgent(config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens))
+    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir)
+    results = runner.run_tasks(selected)
+    console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
 
 
 if __name__ == "__main__":

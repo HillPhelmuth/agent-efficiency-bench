@@ -1,0 +1,62 @@
+# OpenRouter Execution
+
+Agent Efficiency Bench uses OpenRouter as the model provider for live model calls.
+
+## Environment variables
+
+```bash
+export OPENROUTER_API_KEY="..."
+export OPENROUTER_APP_TITLE="Agent Efficiency Bench"          # optional
+export OPENROUTER_HTTP_REFERER="https://github.com/local/aeb" # optional
+```
+
+Commands that call models fail fast if `OPENROUTER_API_KEY` is missing.
+
+## Smoke test
+
+Use a cheap model and a tiny output cap before running any benchmark task:
+
+```bash
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+```
+
+The command prints the returned model, generation ID, prompt tokens, completion tokens, cost, latency, and response content.
+
+## Usage and cost accounting
+
+The OpenRouter client records usage from the chat completion response:
+
+- `usage.prompt_tokens`
+- `usage.completion_tokens`
+- `usage.total_tokens`
+- `usage.cost`
+
+If cost is missing and OpenRouter returned a generation ID, the client can query:
+
+```text
+GET https://openrouter.ai/api/v1/generation?id=<generation_id>
+```
+
+Local token estimates are not used for authoritative accounting. If usage is missing, the run should be treated as telemetry-incomplete rather than silently estimated.
+
+## Reproducibility notes
+
+OpenRouter may route a model ID to different upstream providers. For comparison runs:
+
+- Record both requested model and returned model.
+- Keep temperature at `0.0` unless stochasticity is intentional.
+- Use fixed task subsets.
+- Repeat important runs to measure variance.
+- Keep trace JSONL files as audit evidence.
+
+## Cost safety
+
+Start with:
+
+```text
+limit: 1
+category: web_research
+max_completion_tokens: 256
+```
+
+Do not run Terminal-Bench or SWE-bench full harnesses until you have confirmed Docker/official harness setup and budget caps.

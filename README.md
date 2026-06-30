@@ -20,6 +20,43 @@ PYTHONPATH= uv run aeb build-subset --config configs/sources.yaml --output data/
 PYTHONPATH= uv run aeb catalog data/tasks/public_efficiency_subset.jsonl
 ```
 
+## OpenRouter execution
+
+Live model execution uses OpenRouter. Set:
+
+```bash
+export OPENROUTER_API_KEY="..."
+```
+
+Smoke test:
+
+```bash
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+```
+
+Run one cheap answer-only baseline task:
+
+```bash
+PYTHONPATH= uv run aeb run-answer \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --model openai/gpt-4o-mini \
+  --category web_research \
+  --limit 1 \
+  --output-dir runs/smoke \
+  --max-completion-tokens 256
+```
+
+Generate a report:
+
+```bash
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/smoke/run_telemetry.jsonl \
+  --output runs/smoke/report.md
+```
+
+See `docs/openrouter.md` and `docs/running-benchmarks.md` for full details.
+
 ## Public sources currently scaffolded
 
 - `SWE-bench/SWE-bench_Lite` from Hugging Face — software engineering issue-resolution tasks.

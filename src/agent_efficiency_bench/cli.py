@@ -10,6 +10,7 @@ from rich.table import Table
 
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
+from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task, openrouter_extra_for_mode
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
@@ -109,6 +110,25 @@ def openrouter_smoke(
     table.add_row("latency_seconds", f"{latency:.3f}")
     table.add_row("content", response.content)
     console.print(table)
+
+
+@app.command("run-assistantbench")
+def run_assistantbench(
+    tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
+    model: str = typer.Option(..., help="OpenRouter model id."),
+    limit: int | None = typer.Option(None, help="Maximum AssistantBench tasks to run."),
+    output_dir: str = typer.Option("runs/assistantbench", help="Output directory."),
+    mode: str = typer.Option("closed_book", help="closed_book or openrouter_web_plugin."),
+) -> None:
+    """Run AssistantBench web-research tasks through the OpenRouter answer agent."""
+    loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
+    selected = select_tasks(loaded_tasks, category="web_research", limit=limit)
+    extra = openrouter_extra_for_mode(mode)
+    agent = OpenRouterAnswerAgent(config=ModelConfig(model=model, extra=extra))
+    for task in selected:
+        evaluator = evaluator_for_assistantbench_task(task)
+        BenchmarkRunner(agent=agent, evaluator=evaluator, output_dir=output_dir).run_task(task)
+    console.print(f"[green]Ran {len(selected)} AssistantBench task(s)[/green]; outputs written to {output_dir}")
 
 
 if __name__ == "__main__":

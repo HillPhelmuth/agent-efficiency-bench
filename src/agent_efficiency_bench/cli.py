@@ -16,6 +16,7 @@ from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
+from agent_efficiency_bench.reporting import summarize_by_category, write_markdown_report
 from agent_efficiency_bench.runner import BenchmarkRunner
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
@@ -155,6 +156,21 @@ def swe_bench_command(
     """Print the official SWE-bench evaluation command for predictions."""
     cmd = build_swe_bench_eval_command(predictions_path=predictions_path, run_id=run_id, dataset_name=dataset_name)
     console.print(" ".join(cmd))
+
+
+@app.command("report")
+def report(
+    tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
+    runs: str = typer.Option(..., help="Run telemetry JSONL path."),
+    output: str = typer.Option(..., help="Markdown report output path."),
+) -> None:
+    """Generate a Markdown efficiency report grouped by task category."""
+    task_rows = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
+    run_rows = [RunTelemetry.model_validate(row) for row in read_jsonl(runs)]
+    task_lookup = {task.task_id: task.model_dump() for task in task_rows}
+    summary = summarize_by_category(task_lookup, run_rows)
+    write_markdown_report(output, summary)
+    console.print(f"[green]Wrote report[/green] to {output}")
 
 
 if __name__ == "__main__":

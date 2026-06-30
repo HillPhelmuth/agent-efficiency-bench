@@ -11,6 +11,7 @@ from rich.table import Table
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task, openrouter_extra_for_mode
+from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench_command
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
@@ -129,6 +130,19 @@ def run_assistantbench(
         evaluator = evaluator_for_assistantbench_task(task)
         BenchmarkRunner(agent=agent, evaluator=evaluator, output_dir=output_dir).run_task(task)
     console.print(f"[green]Ran {len(selected)} AssistantBench task(s)[/green]; outputs written to {output_dir}")
+
+
+@app.command("terminal-bench-command")
+def terminal_bench_command(
+    task_id: str = typer.Option(..., help="Terminal-Bench task id."),
+    model: str = typer.Option(..., help="OpenRouter model id."),
+    output_dir: str = typer.Option("runs/terminal-bench", help="Harness output directory."),
+    agent: str = typer.Option("terminus-2", help="Terminal-Bench/Harbor agent name."),
+    dataset: str = typer.Option("terminal-bench/terminal-bench-2-1", help="Harbor dataset id."),
+) -> None:
+    """Print the official Terminal-Bench/Harbor command for a task."""
+    cmd = build_terminal_bench_command(task_id=task_id, model=model, output_dir=output_dir, agent=agent, dataset=dataset)
+    console.print(" ".join(cmd))
 
 
 if __name__ == "__main__":

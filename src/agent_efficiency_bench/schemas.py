@@ -9,6 +9,25 @@ SourceType = Literal["huggingface", "github", "custom"]
 Horizon = Literal["atomic", "short", "medium", "long", "very_long"]
 
 
+class ModelConfig(BaseModel):
+    provider: Literal["openrouter"] = "openrouter"
+    model: str
+    temperature: float = 0.0
+    max_completion_tokens: int = 2048
+    seed: int | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class TraceEvent(BaseModel):
+    t_rel_seconds: float
+    event: str
+    task_id: str | None = None
+    run_id: str | None = None
+    span_id: str | None = None
+    parent_span_id: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
 class Complexity(BaseModel):
     horizon: Horizon
     interaction_type: str = "autonomous"
@@ -94,3 +113,10 @@ class RunTelemetry(BaseModel):
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+
+class RunResult(BaseModel):
+    telemetry: RunTelemetry
+    output: dict[str, Any] = Field(default_factory=dict)
+    trace_path: str
+    artifact_dir: str | None = None

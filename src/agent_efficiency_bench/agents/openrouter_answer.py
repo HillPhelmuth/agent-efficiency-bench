@@ -34,7 +34,12 @@ class OpenRouterAnswerAgent:
         ]
         recorder.emit("llm_call_start", data={"model": self.model})
         started = time.perf_counter()
-        response = self.client.chat(config=self.config, messages=messages)
+        response = self.client.chat(
+            config=self.config,
+            messages=messages,
+            tools=self.config.tools,
+            tool_choice=self.config.tool_choice,
+        )
         latency = time.perf_counter() - started
         budget.add_llm_call(
             prompt_tokens=response.prompt_tokens,

@@ -19,7 +19,7 @@ class FakeResponse:
 
 
 class FakeClient:
-    def chat(self, config, messages, tools=None):
+    def chat(self, config, messages, tools=None, tool_choice=None):
         return FakeResponse()
 
 

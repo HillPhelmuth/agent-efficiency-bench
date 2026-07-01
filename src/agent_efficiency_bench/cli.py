@@ -10,7 +10,11 @@ from rich.table import Table
 
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
-from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task, openrouter_extra_for_mode
+from agent_efficiency_bench.harnesses.assistantbench import (
+    evaluator_for_assistantbench_task,
+    model_config_for_assistantbench_mode,
+    native_web_search_tool,
+)
 from agent_efficiency_bench.harnesses.swe_bench import build_swe_bench_eval_command
 from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench_command
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
@@ -75,11 +79,15 @@ def run_answer(
     limit: int | None = typer.Option(None, help="Maximum tasks to run."),
     output_dir: str = typer.Option("runs/smoke", help="Output directory for traces and JSONL results."),
     max_completion_tokens: int = typer.Option(2048, help="Per-call max completion tokens."),
+    enable_web_search: bool = typer.Option(False, help="Pass native web_search tool configuration to OpenRouter."),
 ) -> None:
     """Run an answer-only OpenRouter baseline over normalized tasks."""
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     selected = select_tasks(loaded_tasks, category=category, limit=limit)
-    agent = OpenRouterAnswerAgent(config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens))
+    tools = [native_web_search_tool()] if enable_web_search else None
+    agent = OpenRouterAnswerAgent(
+        config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
+    )
     runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir)
     results = runner.run_tasks(selected)
     console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
@@ -121,13 +129,12 @@ def run_assistantbench(
     model: str = typer.Option(..., help="OpenRouter model id."),
     limit: int | None = typer.Option(None, help="Maximum AssistantBench tasks to run."),
     output_dir: str = typer.Option("runs/assistantbench", help="Output directory."),
-    mode: str = typer.Option("closed_book", help="closed_book or openrouter_web_plugin."),
+    mode: str = typer.Option("closed_book", help="closed_book or openrouter_web_plugin (native web search)."),
 ) -> None:
     """Run AssistantBench web-research tasks through the OpenRouter answer agent."""
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     selected = select_tasks(loaded_tasks, category="web_research", limit=limit)
-    extra = openrouter_extra_for_mode(mode)
-    agent = OpenRouterAnswerAgent(config=ModelConfig(model=model, extra=extra))
+    agent = OpenRouterAnswerAgent(config=model_config_for_assistantbench_mode(model, mode))
     for task in selected:
         evaluator = evaluator_for_assistantbench_task(task)
         BenchmarkRunner(agent=agent, evaluator=evaluator, output_dir=output_dir).run_task(task)

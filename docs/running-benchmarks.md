@@ -23,14 +23,14 @@ The current subset is intentionally small: 8 SWE-bench Lite tasks, 8 AssistantBe
 Without an API key, this should fail clearly:
 
 ```bash
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 With an API key:
 
 ```bash
 export OPENROUTER_API_KEY="..."
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 ## 4. Run one answer-only baseline task
@@ -38,11 +38,17 @@ PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
 ```bash
 PYTHONPATH= uv run aeb run-answer \
   --tasks data/tasks/public_efficiency_subset.jsonl \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --category web_research \
   --limit 1 \
   --output-dir runs/smoke \
   --max-completion-tokens 256
+```
+
+If the task requires live web search, add `--enable-web-search`. This passes OpenRouter's native server tool configuration:
+
+```json
+{"type": "openrouter:web_search", "parameters": {"engine": "native"}}
 ```
 
 Outputs:
@@ -59,17 +65,17 @@ Closed-book baseline:
 
 ```bash
 PYTHONPATH= uv run aeb run-assistantbench \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --limit 1 \
   --mode closed_book \
   --output-dir runs/assistantbench-smoke
 ```
 
-OpenRouter web plugin mode, if enabled for your account/model:
+OpenRouter web-search mode. The mode name is kept for compatibility, but this now uses `tools=[{"type":"openrouter:web_search"}]` rather than the deprecated plugin API:
 
 ```bash
 PYTHONPATH= uv run aeb run-assistantbench \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --limit 1 \
   --mode openrouter_web_plugin \
   --output-dir runs/assistantbench-web-smoke
@@ -93,7 +99,7 @@ Terminal-Bench command preview:
 ```bash
 PYTHONPATH= uv run aeb terminal-bench-command \
   --task-id count-dataset-tokens \
-  --model openai/gpt-4o-mini
+  --model openai/gpt-5.4-nano
 ```
 
 SWE-bench command preview:

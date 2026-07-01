@@ -52,7 +52,10 @@ class OpenRouterClient:
         config: ModelConfig,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> OpenRouterResponse:
+        request_tools = tools if tools is not None else config.tools
+        request_tool_choice = tool_choice if tool_choice is not None else config.tool_choice
         body: dict[str, Any] = {
             "model": config.model,
             "messages": messages,
@@ -62,8 +65,10 @@ class OpenRouterClient:
         }
         if config.seed is not None:
             body["seed"] = config.seed
-        if tools is not None:
-            body["tools"] = tools
+        if request_tools is not None:
+            body["tools"] = request_tools
+        if request_tool_choice is not None:
+            body["tool_choice"] = request_tool_choice
 
         response = self.session.post(
             f"{self.base_url}/chat/completions",

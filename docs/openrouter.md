@@ -22,6 +22,20 @@ PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
 
 The command prints the returned model, generation ID, prompt tokens, completion tokens, cost, latency, and response content.
 
+## Web search tools
+
+OpenRouter's deprecated `plugins=[{"id":"web"}]` and `:online` model suffix paths are not used. Benchmarks that need current web information should pass the server-tool configuration through `ModelConfig.tools`:
+
+```json
+{
+  "tools": [
+    {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+  ]
+}
+```
+
+`OpenRouterClient.chat(...)` forwards `tools` and optional `tool_choice` into the Chat Completions request. `run-assistantbench --mode openrouter_web_plugin` keeps the historical mode name for compatibility, but now configures `openrouter:web_search` instead of the deprecated plugin API.
+
 ## Usage and cost accounting
 
 The OpenRouter client records usage from the chat completion response:
@@ -57,6 +71,16 @@ Start with:
 limit: 1
 category: web_research
 max_completion_tokens: 256
+```
+
+For generic web-research runs that should use OpenRouter native search, pass:
+
+```bash
+PYTHONPATH= uv run aeb run-answer \
+  --model openai/gpt-5.4-nano \
+  --category web_research \
+  --limit 1 \
+  --enable-web-search
 ```
 
 Do not run Terminal-Bench or SWE-bench full harnesses until you have confirmed Docker/official harness setup and budget caps.

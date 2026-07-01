@@ -1,4 +1,4 @@
-from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task
+from agent_efficiency_bench.harnesses.assistantbench import evaluator_for_assistantbench_task, model_config_for_assistantbench_mode
 from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, SuccessCriteria
 
 
@@ -17,3 +17,9 @@ def test_assistantbench_uses_raw_answer_when_available():
     )
     evaluator = evaluator_for_assistantbench_task(task)
     assert evaluator.evaluate_output({"answer": "paris"}).success is True
+
+
+def test_assistantbench_web_mode_configures_native_web_search_tool():
+    config = model_config_for_assistantbench_mode("openai/gpt-5.4-nano", "openrouter_web_plugin")
+    assert config.model == "openai/gpt-5.4-nano"
+    assert config.tools == [{"type": "openrouter:web_search", "parameters": {"engine": "native"}}]

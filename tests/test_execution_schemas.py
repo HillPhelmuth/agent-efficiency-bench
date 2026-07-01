@@ -8,6 +8,13 @@ def test_model_config_defaults_to_openrouter():
     assert cfg.max_completion_tokens == 2048
 
 
+def test_model_config_can_carry_tools_and_tool_choice():
+    tool = {"type": "function", "function": {"name": "web_search", "parameters": {"type": "object"}}}
+    cfg = ModelConfig(model="openai/gpt-5.4-nano", tools=[tool], tool_choice="auto")
+    assert cfg.tools == [tool]
+    assert cfg.tool_choice == "auto"
+
+
 def test_trace_event_carries_structured_data():
     event = TraceEvent(t_rel_seconds=0.1, event="llm_call_end", data={"cost": 0.01})
     assert event.data["cost"] == 0.01

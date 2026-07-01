@@ -46,6 +46,8 @@ PYTHONPATH= uv run aeb run-answer \
   --max-completion-tokens 256
 ```
 
+Add `--enable-web-search` for tasks that require OpenRouter's native `openrouter:web_search` server tool.
+
 Generate a report:
 
 ```bash

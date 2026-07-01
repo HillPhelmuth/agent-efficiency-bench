@@ -55,3 +55,18 @@ def test_openrouter_client_extracts_usage_and_cost():
     assert result.cost_usd == 0.00001
     assert session.calls[0][2]["Authorization"] == "Bearer test"
     assert session.calls[0][3]["model"] == "openai/gpt-4o-mini"
+
+
+def test_openrouter_client_forwards_configured_tools_and_tool_choice():
+    session = FakeSession()
+    tool = {"type": "function", "function": {"name": "web_search", "parameters": {"type": "object"}}}
+    client = OpenRouterClient(api_key="test", session=session)
+
+    client.chat(
+        config=ModelConfig(model="openai/gpt-5.4-nano", tools=[tool], tool_choice="auto"),
+        messages=[{"role": "user", "content": "find current info"}],
+    )
+
+    body = session.calls[0][3]
+    assert body["tools"] == [tool]
+    assert body["tool_choice"] == "auto"

@@ -15,6 +15,8 @@ class ModelConfig(BaseModel):
     temperature: float = 0.0
     max_completion_tokens: int = 2048
     seed: int | None = None
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: str | dict[str, Any] | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 

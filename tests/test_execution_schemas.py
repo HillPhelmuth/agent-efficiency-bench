@@ -1,4 +1,4 @@
-from agent_efficiency_bench.schemas import ModelConfig, RunResult, RunTelemetry, TraceEvent
+from agent_efficiency_bench.schemas import ModelConfig, RunManifest, RunResult, RunTelemetry, TraceEvent
 
 
 def test_model_config_defaults_to_openrouter():
@@ -18,6 +18,21 @@ def test_model_config_can_carry_tools_and_tool_choice():
 def test_trace_event_carries_structured_data():
     event = TraceEvent(t_rel_seconds=0.1, event="llm_call_end", data={"cost": 0.01})
     assert event.data["cost"] == 0.01
+
+
+def test_run_manifest_records_reproducibility_context():
+    manifest = RunManifest(
+        run_suite_id="suite-1",
+        agent="openrouter-answer",
+        model="openai/gpt-5.4-nano",
+        tasks_path="data/tasks/public_efficiency_subset.jsonl",
+        output_dir="runs/calibration",
+        tools_configured=["openrouter:web_search"],
+        task_ids=["t1"],
+        git_commit="abc123",
+    )
+    assert manifest.tools_configured == ["openrouter:web_search"]
+    assert manifest.task_ids == ["t1"]
 
 
 def test_run_result_wraps_existing_telemetry():

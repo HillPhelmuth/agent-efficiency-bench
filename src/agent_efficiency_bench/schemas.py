@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -115,6 +116,21 @@ class RunTelemetry(BaseModel):
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+
+class RunManifest(BaseModel):
+    run_suite_id: str
+    agent: str
+    model: str
+    output_dir: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    tasks_path: str | None = None
+    task_ids: list[str] = Field(default_factory=list)
+    scaffold: str | None = None
+    tools_configured: list[str] = Field(default_factory=list)
+    budget: dict[str, Any] = Field(default_factory=dict)
+    git_commit: str | None = None
+    environment: dict[str, Any] = Field(default_factory=dict)
 
 
 class RunResult(BaseModel):

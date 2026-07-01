@@ -32,7 +32,15 @@ class OpenRouterAnswerAgent:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task.instruction},
         ]
-        recorder.emit("llm_call_start", data={"model": self.model})
+        recorder.emit(
+            "llm_call_start",
+            data={
+                "model": self.model,
+                "tools_configured": _tool_names(self.config.tools),
+                "tools": self.config.tools or [],
+                "tool_choice": self.config.tool_choice,
+            },
+        )
         started = time.perf_counter()
         response = self.client.chat(
             config=self.config,
@@ -58,6 +66,8 @@ class OpenRouterAnswerAgent:
                 "cost_usd": response.cost_usd,
                 "latency_seconds": latency,
                 "finish_reason": response.finish_reason,
+                "annotations": _response_annotations(response.raw),
+                "citations": _response_citations(response.raw),
             },
         )
         termination = budget.termination_reason() or "not_evaluated"
@@ -77,3 +87,35 @@ class OpenRouterAnswerAgent:
             trace_path=str(trace_path),
             artifact_dir=str(artifact_path),
         )
+
+
+def _tool_names(tools: list[dict] | None) -> list[str]:
+    names = []
+    for tool in tools or []:
+        if tool.get("type") == "function":
+            function = tool.get("function") or {}
+            names.append(function.get("name") or "function")
+        else:
+            names.append(str(tool.get("type") or "unknown"))
+    return names
+
+
+def _response_annotations(raw: dict) -> list[dict]:
+    annotations = []
+    for choice in raw.get("choices") or []:
+        message = choice.get("message") or {}
+        annotations.extend(message.get("annotations") or [])
+    return annotations
+
+
+def _response_citations(raw: dict) -> list[str]:
+    citations = []
+    for annotation in _response_annotations(raw):
+        citation = annotation.get("url_citation") or {}
+        url = citation.get("url")
+        if url:
+            citations.append(url)
+    for citation in raw.get("citations") or []:
+        if citation not in citations:
+            citations.append(citation)
+    return citations

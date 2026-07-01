@@ -18,6 +18,11 @@ def evaluator_for_assistantbench_task(task: BenchmarkTask):
     return NoOpEvaluator()
 
 
+class AssistantBenchEvaluator:
+    def evaluate(self, task, result):
+        return evaluator_for_assistantbench_task(task).evaluate(task, result)
+
+
 def model_config_for_assistantbench_mode(model: str, mode: str, max_completion_tokens: int = 2048) -> ModelConfig:
     if mode == "closed_book":
         return ModelConfig(model=model, max_completion_tokens=max_completion_tokens)

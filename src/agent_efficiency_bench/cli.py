@@ -11,7 +11,7 @@ from rich.table import Table
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import (
-    evaluator_for_assistantbench_task,
+    AssistantBenchEvaluator,
     model_config_for_assistantbench_mode,
     native_web_search_tool,
 )
@@ -88,7 +88,7 @@ def run_answer(
     agent = OpenRouterAnswerAgent(
         config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
     )
-    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir)
+    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir, tasks_path=tasks)
     results = runner.run_tasks(selected)
     console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
 
@@ -135,9 +135,8 @@ def run_assistantbench(
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     selected = select_tasks(loaded_tasks, category="web_research", limit=limit)
     agent = OpenRouterAnswerAgent(config=model_config_for_assistantbench_mode(model, mode))
-    for task in selected:
-        evaluator = evaluator_for_assistantbench_task(task)
-        BenchmarkRunner(agent=agent, evaluator=evaluator, output_dir=output_dir).run_task(task)
+    runner = BenchmarkRunner(agent=agent, evaluator=AssistantBenchEvaluator(), output_dir=output_dir, tasks_path=tasks)
+    runner.run_tasks(selected)
     console.print(f"[green]Ran {len(selected)} AssistantBench task(s)[/green]; outputs written to {output_dir}")
 
 

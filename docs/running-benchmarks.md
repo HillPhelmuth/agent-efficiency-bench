@@ -92,6 +92,31 @@ PYTHONPATH= uv run aeb report \
   --output runs/smoke/report.md
 ```
 
+Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, task file path, and configured tools. Trace files also record configured tools on `llm_call_start` and response annotations/citations on `llm_call_end` when OpenRouter returns them.
+
+## 6a. Two-mode AssistantBench calibration
+
+Use the same small task slice in closed-book and web-search modes to compare the cost/latency lift from live search:
+
+```bash
+PYTHONPATH= uv run aeb run-assistantbench \
+  --model openai/gpt-5.4-nano \
+  --limit 1 \
+  --mode closed_book \
+  --output-dir runs/calibration-closed-book
+
+PYTHONPATH= uv run aeb run-assistantbench \
+  --model openai/gpt-5.4-nano \
+  --limit 1 \
+  --mode openrouter_web_plugin \
+  --output-dir runs/calibration-web-search
+
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/calibration-web-search/run_telemetry.jsonl \
+  --output runs/calibration-web-search/report.md
+```
+
 ## 7. Official harness command adapters
 
 Terminal-Bench command preview:

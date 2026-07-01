@@ -35,6 +35,7 @@ def test_fake_provider_execution_flow_writes_trace_and_report(tmp_path):
     assert result.telemetry.estimated_usd == 0.002
     assert (tmp_path / "runs" / "run_results.jsonl").exists()
     assert (tmp_path / "runs" / "run_telemetry.jsonl").exists()
+    assert (tmp_path / "runs" / "manifest.json").exists()
     trace_rows = read_jsonl(result.trace_path)
     assert [row["event"] for row in trace_rows] == ["task_start", "llm_call_start", "llm_call_end", "task_end"]
 

@@ -1,11 +1,12 @@
 from agent_efficiency_bench.evaluators.base import EvaluationScore
 from agent_efficiency_bench.runner import BenchmarkRunner
-from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, RunResult, RunTelemetry, SuccessCriteria
+from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, ModelConfig, RunResult, RunTelemetry, SuccessCriteria
 
 
 class FakeAgent:
     name = "fake-agent"
     model = "fake-model"
+    config = ModelConfig(model="fake-model", tools=[{"type": "openrouter:web_search"}])
 
     def run(self, task, artifact_dir):
         telemetry = RunTelemetry(
@@ -49,3 +50,23 @@ def test_runner_updates_telemetry_with_evaluation(tmp_path):
     assert result.telemetry.quality_score == 1.0
     assert (tmp_path / "run_results.jsonl").exists()
     assert (tmp_path / "run_telemetry.jsonl").exists()
+
+
+def test_runner_writes_manifest_with_agent_model_tools_and_tasks(tmp_path):
+    runner = BenchmarkRunner(
+        agent=FakeAgent(),
+        evaluator=FakeEvaluator(),
+        output_dir=tmp_path,
+        tasks_path="data/tasks/public_efficiency_subset.jsonl",
+        run_suite_id="suite-test",
+    )
+    runner.run_task(make_task())
+
+    import json
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["run_suite_id"] == "suite-test"
+    assert manifest["agent"] == "fake-agent"
+    assert manifest["model"] == "fake-model"
+    assert manifest["tools_configured"] == ["openrouter:web_search"]
+    assert manifest["task_ids"] == ["t1"]

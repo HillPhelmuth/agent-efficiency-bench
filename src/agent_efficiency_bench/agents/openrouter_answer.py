@@ -70,7 +70,12 @@ class OpenRouterAnswerAgent:
                 "citations": _response_citations(response.raw),
             },
         )
-        termination = budget.termination_reason() or "not_evaluated"
+        termination = budget.termination_reason()
+        budget_data = _budget_check_data(budget, termination)
+        recorder.emit("budget_check", data=budget_data)
+        if termination:
+            recorder.emit("budget_exceeded", data=budget_data)
+        termination = termination or "not_evaluated"
         telemetry = budget.to_run_telemetry(
             run_id=run_id,
             task_id=task.task_id,
@@ -98,6 +103,22 @@ def _tool_names(tools: list[dict] | None) -> list[str]:
         else:
             names.append(str(tool.get("type") or "unknown"))
     return names
+
+
+def _budget_check_data(budget: BudgetTracker, termination: str | None) -> dict:
+    return {
+        "termination_reason": termination,
+        "total_tokens": budget.total_tokens,
+        "max_total_tokens": budget.budget.max_total_tokens,
+        "estimated_usd": budget.estimated_usd,
+        "max_estimated_usd": budget.budget.max_estimated_usd,
+        "elapsed_seconds": budget.elapsed_seconds(),
+        "max_wall_clock_seconds": budget.budget.max_wall_clock_seconds,
+        "num_llm_calls": budget.num_llm_calls,
+        "max_llm_calls": budget.budget.max_llm_calls,
+        "num_tool_calls": budget.num_tool_calls,
+        "max_tool_calls": budget.budget.max_tool_calls,
+    }
 
 
 def _response_annotations(raw: dict) -> list[dict]:

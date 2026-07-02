@@ -253,14 +253,14 @@ Tests cover full success, partial text failure, numeric tolerance success, missi
 
 ---
 
-## [ ] Task 6: Enforce budgets during execution
+## [x] Task 6: Enforce budgets during execution
 
 ### Acceptance Criteria
 
-- [ ] Budget limits stop or mark runs consistently when exceeded.
-- [ ] Termination reasons distinguish token, cost, time, tool-call, and LLM-call budget exits.
-- [ ] Traces record budget checks and budget-exceeded events.
-- [ ] Tests cover budget pass and budget exceeded cases.
+- [x] Budget limits stop or mark runs consistently when exceeded.
+- [x] Termination reasons distinguish token, cost, time, tool-call, and LLM-call budget exits.
+- [x] Traces record budget checks and budget-exceeded events.
+- [x] Tests cover budget pass and budget exceeded cases.
 
 ### Detailed Technical Instructions
 
@@ -281,7 +281,13 @@ Tests cover full success, partial text failure, numeric tolerance success, missi
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/agents/openrouter_answer.py`, `tests/test_answer_agent.py`, `tests/test_integration_fake_provider.py`, and `docs/running-benchmarks.md`.
+
+The answer-only agent now emits a `budget_check` trace event after the LLM call with token, cost, elapsed-time, LLM-call, and tool-call counters plus configured maxima. When a budget limit is exceeded, it also emits `budget_exceeded` and preserves the specific termination reason such as `budget_tokens` in `RunTelemetry.terminated_by`.
+
+Existing `BudgetTracker.termination_reason()` already distinguishes token, wall-clock time, estimated cost, tool-call, and LLM-call exits. The new tests verify both passing budget checks and budget-exceeded traces for the answer agent. Integration trace expectations were updated to include `budget_check`. Documentation now clarifies that budget-exceeded runs still count toward aggregate cost, tokens, and latency already consumed before detection.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_budget.py tests/test_answer_agent.py -q` and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `49 passed`.
 
 ---
 

@@ -85,3 +85,30 @@ def test_answer_agent_traces_configured_tools_and_response_annotations(tmp_path)
     assert start["data"]["tools_configured"] == ["openrouter:web_search"]
     assert end["data"]["annotations"] == [{"type": "url_citation", "url_citation": {"url": "https://example.com"}}]
     assert end["data"]["citations"] == ["https://example.com"]
+
+
+def test_answer_agent_traces_budget_checks_when_budget_passes(tmp_path):
+    agent = OpenRouterAnswerAgent(client=FakeClient(), config=ModelConfig(model="fake/model"))
+
+    result = agent.run(make_task(), artifact_dir=tmp_path)
+
+    import json
+
+    trace_rows = [json.loads(line) for line in open(result.trace_path, encoding="utf-8")]
+    budget_check = next(row for row in trace_rows if row["event"] == "budget_check")
+    assert budget_check["data"]["termination_reason"] is None
+
+
+def test_answer_agent_marks_budget_exceeded_and_traces_event(tmp_path):
+    task = make_task()
+    task.budgets = Budget(max_total_tokens=10)
+    agent = OpenRouterAnswerAgent(client=FakeClient(), config=ModelConfig(model="fake/model"))
+
+    result = agent.run(task, artifact_dir=tmp_path)
+
+    import json
+
+    trace_rows = [json.loads(line) for line in open(result.trace_path, encoding="utf-8")]
+    exceeded = next(row for row in trace_rows if row["event"] == "budget_exceeded")
+    assert result.telemetry.terminated_by == "budget_tokens"
+    assert exceeded["data"]["termination_reason"] == "budget_tokens"

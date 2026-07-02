@@ -153,5 +153,6 @@ These commands only print official harness invocations. They do not execute Dock
 ## Safety notes
 
 - Failed runs still count toward aggregate cost, tokens, and latency.
+- Budget-exceeded runs still count toward aggregate cost, tokens, and latency already consumed before the budget exit was detected.
 - Full Terminal-Bench/SWE-bench runs require external official harness setup.
 - Always start with `--limit 1` and inspect trace files before scaling up.

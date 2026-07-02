@@ -90,6 +90,13 @@ PYTHONPATH= uv run aeb report \
   --tasks data/tasks/public_efficiency_subset.jsonl \
   --runs runs/smoke/run_telemetry.jsonl \
   --output runs/smoke/report.md
+
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/smoke/run_telemetry.jsonl \
+  --manifest runs/smoke/manifest.json \
+  --group-by category,model,tools_enabled,horizon \
+  --output runs/smoke/grouped-report.md
 ```
 
 Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, task file path, configured tools, budget metadata, and environment metadata. Trace files also record configured tools on `llm_call_start` and response annotations/citations on `llm_call_end` when OpenRouter returns them.

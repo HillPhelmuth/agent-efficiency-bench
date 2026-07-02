@@ -8,3 +8,39 @@ def test_openrouter_smoke_requires_api_key(monkeypatch):
     result = CliRunner().invoke(app, ["openrouter-smoke", "--model", "openai/gpt-4o-mini"])
     assert result.exit_code != 0
     assert "OPENROUTER_API_KEY" in result.output
+
+
+def test_report_cli_accepts_group_by_dimensions(tmp_path):
+    tasks = tmp_path / "tasks.jsonl"
+    runs = tmp_path / "run_telemetry.jsonl"
+    manifest = tmp_path / "manifest.json"
+    report = tmp_path / "report.md"
+    tasks.write_text(
+        '{"task_id":"t1","source":"AssistantBench","source_type":"huggingface","category":"web_research","instruction":"Q?","environment":{},"complexity":{"horizon":"short"},"success_criteria":{"type":"manual"}}\n',
+        encoding="utf-8",
+    )
+    runs.write_text(
+        '{"run_id":"r1","task_id":"t1","agent":"openrouter-answer","model":"openai/gpt-5.4-nano","success":true,"quality_score":1.0,"wall_clock_seconds":1.0,"input_tokens":1,"output_tokens":1,"estimated_usd":0.01}\n',
+        encoding="utf-8",
+    )
+    manifest.write_text('{"tools_configured":["openrouter:web_search"]}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "report",
+            "--tasks",
+            str(tasks),
+            "--runs",
+            str(runs),
+            "--output",
+            str(report),
+            "--group-by",
+            "category,model,tools_enabled",
+            "--manifest",
+            str(manifest),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "tools_enabled=true" in report.read_text(encoding="utf-8")

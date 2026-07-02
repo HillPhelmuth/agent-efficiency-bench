@@ -16,6 +16,57 @@ def summarize_by_category(tasks: dict[str, dict[str, Any]], runs: list[RunTeleme
     return {category: _summary_for_runs(category_runs) for category, category_runs in sorted(grouped.items())}
 
 
+def summarize_by_dimensions(
+    tasks: dict[str, dict[str, Any]],
+    runs: list[RunTelemetry],
+    dimensions: list[str],
+    manifests: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[RunTelemetry]] = {}
+    for run in runs:
+        key = _group_key(tasks.get(run.task_id, {}), run, dimensions, manifests or {})
+        grouped.setdefault(key, []).append(run)
+    return {key: _summary_for_runs(group_runs) for key, group_runs in sorted(grouped.items())}
+
+
+def _group_key(
+    task: dict[str, Any],
+    run: RunTelemetry,
+    dimensions: list[str],
+    manifests: dict[str, dict[str, Any]],
+) -> str:
+    parts = []
+    for dimension in dimensions:
+        parts.append(f"{dimension}={_dimension_value(task, run, dimension, manifests)}")
+    return " | ".join(parts) if parts else "all"
+
+
+def _dimension_value(
+    task: dict[str, Any],
+    run: RunTelemetry,
+    dimension: str,
+    manifests: dict[str, dict[str, Any]],
+) -> str:
+    if dimension in {"category", "source"}:
+        return str(task.get(dimension, "unknown"))
+    if dimension == "model":
+        return run.model
+    if dimension == "agent":
+        return run.agent
+    if dimension == "scaffold":
+        return run.scaffold or "unknown"
+    if dimension == "horizon":
+        return str((task.get("complexity") or {}).get("horizon", "unknown"))
+    if dimension == "requires_external_search":
+        value = bool((task.get("complexity") or {}).get("requires_external_search", False))
+        return str(value).lower()
+    if dimension == "tools_enabled":
+        manifest = manifests.get(run.run_id) or manifests.get("*") or {}
+        value = bool(manifest.get("tools_configured"))
+        return str(value).lower()
+    return "unknown"
+
+
 def _summary_for_runs(runs: list[RunTelemetry]) -> dict[str, Any]:
     aggregate = aggregate_runs(runs).model_dump()
     costs = [run.estimated_usd for run in runs]
@@ -50,9 +101,9 @@ def write_markdown_report(output: str | Path, summary: dict[str, dict[str, Any]]
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
     metrics = sorted({metric for values in summary.values() for metric in values})
-    lines = ["# Agent Efficiency Report", "", "| category | metric | value |", "|---|---|---|"]
-    for category, values in sorted(summary.items()):
+    lines = ["# Agent Efficiency Report", "", "| group | metric | value |", "|---|---|---|"]
+    for group, values in sorted(summary.items()):
         for metric in metrics:
             if metric in values:
-                lines.append(f"| {category} | {metric} | {values[metric]} |")
+                lines.append(f"| {group} | {metric} | {values[metric]} |")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

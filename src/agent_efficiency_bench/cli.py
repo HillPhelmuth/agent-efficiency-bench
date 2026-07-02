@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import json
 from pathlib import Path
 import time
 
@@ -20,7 +21,7 @@ from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
-from agent_efficiency_bench.reporting import summarize_by_category, write_markdown_report
+from agent_efficiency_bench.reporting import summarize_by_category, summarize_by_dimensions, write_markdown_report
 from agent_efficiency_bench.runner import BenchmarkRunner
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
@@ -169,14 +170,28 @@ def report(
     tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
     runs: str = typer.Option(..., help="Run telemetry JSONL path."),
     output: str = typer.Option(..., help="Markdown report output path."),
+    group_by: str = typer.Option("category", help="Comma-separated grouping dimensions."),
+    manifest: str | None = typer.Option(None, help="Optional run manifest JSON path for tool metadata."),
 ) -> None:
-    """Generate a Markdown efficiency report grouped by task category."""
+    """Generate a Markdown efficiency report grouped by selected dimensions."""
     task_rows = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     run_rows = [RunTelemetry.model_validate(row) for row in read_jsonl(runs)]
     task_lookup = {task.task_id: task.model_dump() for task in task_rows}
-    summary = summarize_by_category(task_lookup, run_rows)
+    dimensions = [part.strip() for part in group_by.split(",") if part.strip()]
+    if dimensions == ["category"] and manifest is None:
+        summary = summarize_by_category(task_lookup, run_rows)
+    else:
+        manifests = _manifest_lookup(manifest, run_rows)
+        summary = summarize_by_dimensions(task_lookup, run_rows, dimensions, manifests=manifests)
     write_markdown_report(output, summary)
     console.print(f"[green]Wrote report[/green] to {output}")
+
+
+def _manifest_lookup(manifest: str | None, runs: list[RunTelemetry]) -> dict[str, dict]:
+    if not manifest:
+        return {}
+    data = json.loads(Path(manifest).read_text(encoding="utf-8"))
+    return {run.run_id: data for run in runs}
 
 
 if __name__ == "__main__":

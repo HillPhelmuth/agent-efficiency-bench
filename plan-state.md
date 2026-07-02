@@ -105,15 +105,15 @@ Documentation in `docs/running-benchmarks.md` now states that `manifest.json` in
 
 ---
 
-## [ ] Task 3: Add report grouping by model, scaffold, source, tools, and complexity
+## [x] Task 3: Add report grouping by model, scaffold, source, tools, and complexity
 
 ### Acceptance Criteria
 
-- [ ] Reports can summarize runs by category, source, model, scaffold, tools-enabled flag, and complexity horizon.
-- [ ] CLI exposes grouping options for report generation.
-- [ ] Report output clearly distinguishes closed-book and web-search runs.
-- [ ] Tests cover at least category, model, and tools-enabled grouping.
-- [ ] Existing report behavior remains backward compatible.
+- [x] Reports can summarize runs by category, source, model, scaffold, tools-enabled flag, and complexity horizon.
+- [x] CLI exposes grouping options for report generation.
+- [x] Report output clearly distinguishes closed-book and web-search runs.
+- [x] Tests cover at least category, model, and tools-enabled grouping.
+- [x] Existing report behavior remains backward compatible.
 
 ### Detailed Technical Instructions
 
@@ -145,7 +145,13 @@ Documentation in `docs/running-benchmarks.md` now states that `manifest.json` in
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/reporting.py`, `src/agent_efficiency_bench/cli.py`, `tests/test_reporting.py`, `tests/test_cli.py`, and `docs/running-benchmarks.md`.
+
+Added `summarize_by_dimensions(tasks, runs, dimensions, manifests=None)` with support for `category`, `source`, `model`, `agent`, `scaffold`, `horizon`, `requires_external_search`, and `tools_enabled`. Group keys are rendered as readable strings such as `category=web_research | model=openai/gpt-5.4-nano | tools_enabled=true`. `tools_enabled` uses manifest `tools_configured` metadata when a manifest is provided and falls back to `false` when absent.
+
+The `aeb report` CLI now accepts `--group-by` and optional `--manifest`. The default remains backward-compatible category grouping when no manifest and default `--group-by category` are used. Markdown reports now label the first column as `group` instead of assuming category-only grouping.
+
+Tests cover grouped summaries by category/model/tools-enabled, fallback tools-disabled behavior, and CLI invocation with `--group-by category,model,tools_enabled --manifest <manifest.json>`. Documentation now includes an example grouped report command. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_reporting.py tests/test_cli.py -q` and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `39 passed`.
 
 ---
 

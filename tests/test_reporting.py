@@ -1,4 +1,4 @@
-from agent_efficiency_bench.reporting import summarize_by_category, write_markdown_report
+from agent_efficiency_bench.reporting import summarize_by_category, summarize_by_dimensions, write_markdown_report
 from agent_efficiency_bench.schemas import RunTelemetry
 
 
@@ -28,3 +28,50 @@ def test_write_markdown_report_contains_category(tmp_path):
     text = output.read_text()
     assert "web_research" in text
     assert "cost_per_success" in text
+
+
+def test_summarize_by_dimensions_groups_by_category_model_and_tools_enabled():
+    tasks = {"t1": {"category": "web_research", "source": "AssistantBench", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            success=True,
+            quality_score=1.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+        )
+    ]
+    manifests = {"r1": {"tools_configured": ["openrouter:web_search"]}}
+
+    summary = summarize_by_dimensions(tasks, runs, ["category", "model", "tools_enabled"], manifests=manifests)
+
+    key = "category=web_research | model=openai/gpt-5.4-nano | tools_enabled=true"
+    assert summary[key]["total_runs"] == 1
+    assert summary[key]["cost_per_success"] == 0.10
+
+
+def test_summarize_by_dimensions_falls_back_to_tools_disabled_without_manifest():
+    tasks = {"t1": {"category": "web_research", "source": "AssistantBench", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            success=False,
+            quality_score=0.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+        )
+    ]
+
+    summary = summarize_by_dimensions(tasks, runs, ["tools_enabled"])
+
+    assert "tools_enabled=false" in summary

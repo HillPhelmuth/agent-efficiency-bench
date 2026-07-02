@@ -155,15 +155,15 @@ Tests cover grouped summaries by category/model/tools-enabled, fallback tools-di
 
 ---
 
-## [ ] Task 4: Add a task-audit CLI command
+## [x] Task 4: Add a task-audit CLI command
 
 ### Acceptance Criteria
 
-- [ ] New CLI command audits normalized task JSONL files.
-- [ ] Audit reports counts by source, category, horizon, interaction type, and success criteria type.
-- [ ] Audit flags tasks with missing or weak evaluator paths.
-- [ ] Audit flags placeholder or suspiciously short instructions.
-- [ ] Tests cover the audit logic.
+- [x] New CLI command audits normalized task JSONL files.
+- [x] Audit reports counts by source, category, horizon, interaction type, and success criteria type.
+- [x] Audit flags tasks with missing or weak evaluator paths.
+- [x] Audit flags placeholder or suspiciously short instructions.
+- [x] Tests cover the audit logic.
 
 ### Detailed Technical Instructions
 
@@ -195,7 +195,13 @@ Tests cover grouped summaries by category/model/tools-enabled, fallback tools-di
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/task_audit.py`, `src/agent_efficiency_bench/cli.py`, `tests/test_task_audit.py`, `tests/test_cli.py`, and `docs/running-benchmarks.md`.
+
+Added `audit_tasks(tasks, min_instruction_chars=20)` and `format_audit_markdown(audit)`. The audit reports counts by source, category, complexity horizon, interaction type, and success criteria type. It also reports requirement counts for `requires_external_search`, `requires_code_execution`, and `requires_recovery`.
+
+Added warnings for short instructions, placeholder instructions such as `|-`, manual evaluator usage, and missing `raw.answer` metadata for exact/structured-answer tasks. The new CLI command is `aeb audit-tasks <tasks.jsonl> --output <audit.md>` and writes a markdown audit report when `--output` is provided, or prints markdown to the console otherwise.
+
+Tests cover audit counts, warning generation, markdown formatting, and CLI output writing. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_task_audit.py tests/test_cli.py -q` and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `42 passed`.
 
 ---
 

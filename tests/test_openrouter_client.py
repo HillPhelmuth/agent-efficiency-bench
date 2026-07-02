@@ -22,7 +22,7 @@ class FakeSession:
         return FakeResponse(
             {
                 "id": "gen-1",
-                "model": "openai/gpt-4o-mini",
+                "model": "openai/gpt-5.4-nano",
                 "choices": [
                     {
                         "message": {"role": "assistant", "content": "hello"},
@@ -43,7 +43,7 @@ def test_openrouter_client_extracts_usage_and_cost():
     session = FakeSession()
     client = OpenRouterClient(api_key="test", session=session)
     result = client.chat(
-        config=ModelConfig(model="openai/gpt-4o-mini"),
+        config=ModelConfig(model="openai/gpt-5.4-nano"),
         messages=[{"role": "user", "content": "hi"}],
     )
 
@@ -54,7 +54,7 @@ def test_openrouter_client_extracts_usage_and_cost():
     assert result.total_tokens == 14
     assert result.cost_usd == 0.00001
     assert session.calls[0][2]["Authorization"] == "Bearer test"
-    assert session.calls[0][3]["model"] == "openai/gpt-4o-mini"
+    assert session.calls[0][3]["model"] == "openai/gpt-5.4-nano"
 
 
 def test_openrouter_client_forwards_configured_tools_and_tool_choice():

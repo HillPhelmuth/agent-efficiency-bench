@@ -146,7 +146,7 @@ from agent_efficiency_bench.schemas import ModelConfig, RunResult, RunTelemetry,
 
 
 def test_model_config_defaults_to_openrouter():
-    cfg = ModelConfig(model="openai/gpt-4o-mini")
+    cfg = ModelConfig(model="openai/gpt-5.4-nano")
     assert cfg.provider == "openrouter"
     assert cfg.temperature == 0.0
     assert cfg.max_completion_tokens == 2048
@@ -306,7 +306,7 @@ class FakeSession:
         self.calls.append((url, headers, json, timeout))
         return FakeResponse({
             "id": "gen-1",
-            "model": "openai/gpt-4o-mini",
+            "model": "openai/gpt-5.4-nano",
             "choices": [{"message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 11, "completion_tokens": 3, "total_tokens": 14, "cost": 0.00001},
         })
@@ -316,7 +316,7 @@ def test_openrouter_client_extracts_usage_and_cost():
     session = FakeSession()
     client = OpenRouterClient(api_key="test", session=session)
     result = client.chat(
-        config=ModelConfig(model="openai/gpt-4o-mini"),
+        config=ModelConfig(model="openai/gpt-5.4-nano"),
         messages=[{"role": "user", "content": "hi"}],
     )
 
@@ -409,7 +409,7 @@ if not os.getenv("OPENROUTER_API_KEY"):
 
 client = OpenRouterClient()
 resp = client.chat(
-    ModelConfig(model="openai/gpt-4o-mini", max_completion_tokens=16),
+    ModelConfig(model="openai/gpt-5.4-nano", max_completion_tokens=16),
     [{"role": "user", "content": "Reply with exactly: ok"}],
 )
 print(resp.model_dump())
@@ -735,7 +735,7 @@ Add to `src/agent_efficiency_bench/cli.py`:
 ```bash
 aeb run-answer \
   --tasks data/tasks/public_efficiency_subset.jsonl \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --limit 1 \
   --output-dir runs/smoke
 ```
@@ -771,7 +771,7 @@ git commit -m "feat: add benchmark runner orchestration"
 **Step 1: Add command**
 
 ```bash
-aeb openrouter-smoke --model openai/gpt-4o-mini
+aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Behavior:
@@ -786,7 +786,7 @@ Behavior:
 Without API key:
 
 ```bash
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Expected: clear missing key error.
@@ -794,7 +794,7 @@ Expected: clear missing key error.
 With API key:
 
 ```bash
-OPENROUTER_API_KEY=... PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+OPENROUTER_API_KEY=... PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Expected: response includes nonzero token counts and cost or generation-stats-audited cost.
@@ -853,7 +853,7 @@ def test_assistantbench_uses_raw_answer_when_available():
 **Step 3: Add CLI selector**
 
 ```bash
-aeb run-assistantbench --model openai/gpt-4o-mini --limit 3 --mode closed_book
+aeb run-assistantbench --model openai/gpt-5.4-nano --limit 3 --mode closed_book
 ```
 
 **Step 4: Run and commit**
@@ -894,10 +894,10 @@ from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench
 
 
 def test_terminal_bench_command_includes_model_and_task():
-    cmd = build_terminal_bench_command(task_id="count-dataset-tokens", model="openai/gpt-4o-mini", output_dir="runs/tb")
+    cmd = build_terminal_bench_command(task_id="count-dataset-tokens", model="openai/gpt-5.4-nano", output_dir="runs/tb")
     joined = " ".join(cmd)
     assert "count-dataset-tokens" in joined
-    assert "openai/gpt-4o-mini" in joined
+    assert "openai/gpt-5.4-nano" in joined
 ```
 
 **Step 2: Implement adapter**
@@ -921,7 +921,7 @@ If Harbor CLI syntax differs, this is the first place to update. Keep it central
 **Step 3: CLI dry run**
 
 ```bash
-aeb terminal-bench-command --task-id count-dataset-tokens --model openai/gpt-4o-mini
+aeb terminal-bench-command --task-id count-dataset-tokens --model openai/gpt-5.4-nano
 ```
 
 **Step 4: Full execution later**
@@ -1177,7 +1177,7 @@ Expected: 24 tasks across `software_engineering`, `terminal_work`, and `web_rese
 
 ```bash
 unset OPENROUTER_API_KEY
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Expected: clear error saying `OPENROUTER_API_KEY` is required.
@@ -1186,7 +1186,7 @@ Expected: clear error saying `OPENROUTER_API_KEY` is required.
 
 ```bash
 export OPENROUTER_API_KEY="..."
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Expected: prints response text, generation ID, prompt tokens, completion tokens, cost, and latency.
@@ -1196,7 +1196,7 @@ Expected: prints response text, generation ID, prompt tokens, completion tokens,
 ```bash
 PYTHONPATH= uv run aeb run-answer \
   --tasks data/tasks/public_efficiency_subset.jsonl \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --category web_research \
   --limit 1 \
   --output-dir runs/smoke
@@ -1262,7 +1262,7 @@ Expected: Markdown report with efficiency metrics.
 Recommended defaults for first live run:
 
 ```text
-model: openai/gpt-4o-mini or another cheap OpenRouter model
+model: openai/gpt-5.4-nano or another cheap OpenRouter model
 categories: web_research only
 limit: 1
 max_cost_per_task: $0.05

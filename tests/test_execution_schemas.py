@@ -2,7 +2,7 @@ from agent_efficiency_bench.schemas import ModelConfig, RunManifest, RunResult, 
 
 
 def test_model_config_defaults_to_openrouter():
-    cfg = ModelConfig(model="openai/gpt-4o-mini")
+    cfg = ModelConfig(model="openai/gpt-5.4-nano")
     assert cfg.provider == "openrouter"
     assert cfg.temperature == 0.0
     assert cfg.max_completion_tokens == 2048

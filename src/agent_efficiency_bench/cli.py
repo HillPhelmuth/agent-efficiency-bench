@@ -77,7 +77,7 @@ def score_runs(path: str) -> None:
 @app.command("run-answer")
 def run_answer(
     tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
-    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-5.4-nano."),
     category: str | None = typer.Option(None, help="Optional task category filter."),
     limit: int | None = typer.Option(None, help="Maximum tasks to run."),
     output_dir: str = typer.Option("runs/smoke", help="Output directory for traces and JSONL results."),
@@ -99,7 +99,7 @@ def run_answer(
 @app.command("run-tool-loop")
 def run_tool_loop(
     tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
-    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-5.4-nano."),
     category: str | None = typer.Option(None, help="Optional task category filter."),
     limit: int | None = typer.Option(None, help="Maximum tasks to run."),
     output_dir: str = typer.Option("runs/tool-loop", help="Output directory for traces and JSONL results."),
@@ -120,7 +120,7 @@ def run_tool_loop(
 
 @app.command("openrouter-smoke")
 def openrouter_smoke(
-    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-5.4-nano."),
 ) -> None:
     """Verify OpenRouter connectivity and token/cost telemetry with one tiny request."""
     try:

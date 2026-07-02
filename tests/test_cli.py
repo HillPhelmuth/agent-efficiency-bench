@@ -5,7 +5,7 @@ from agent_efficiency_bench.cli import app
 
 def test_openrouter_smoke_requires_api_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    result = CliRunner().invoke(app, ["openrouter-smoke", "--model", "openai/gpt-4o-mini"])
+    result = CliRunner().invoke(app, ["openrouter-smoke", "--model", "openai/gpt-5.4-nano"])
     assert result.exit_code != 0
     assert "OPENROUTER_API_KEY" in result.output
 

@@ -17,7 +17,7 @@ Commands that call models fail fast if `OPENROUTER_API_KEY` is missing.
 Use a cheap model and a tiny output cap before running any benchmark task:
 
 ```bash
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 The command prints the returned model, generation ID, prompt tokens, completion tokens, cost, latency, and response content.

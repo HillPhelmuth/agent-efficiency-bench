@@ -31,7 +31,7 @@ export OPENROUTER_API_KEY="..."
 Smoke test:
 
 ```bash
-PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-4o-mini
+PYTHONPATH= uv run aeb openrouter-smoke --model openai/gpt-5.4-nano
 ```
 
 Run one cheap answer-only baseline task:
@@ -39,7 +39,7 @@ Run one cheap answer-only baseline task:
 ```bash
 PYTHONPATH= uv run aeb run-answer \
   --tasks data/tasks/public_efficiency_subset.jsonl \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --category web_research \
   --limit 1 \
   --output-dir runs/smoke \
@@ -51,7 +51,7 @@ Run the minimal two-call tool-loop scaffold when you want to compare a research/
 ```bash
 PYTHONPATH= uv run aeb run-tool-loop \
   --tasks data/tasks/public_efficiency_subset.jsonl \
-  --model openai/gpt-4o-mini \
+  --model openai/gpt-5.4-nano \
   --category web_research \
   --limit 1 \
   --output-dir runs/tool-loop-smoke \

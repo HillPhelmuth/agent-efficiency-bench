@@ -291,15 +291,15 @@ Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_budg
 
 ---
 
-## [ ] Task 7: Publish a first baseline calibration report
+## [x] Task 7: Publish a first baseline calibration report
 
 ### Acceptance Criteria
 
-- [ ] A markdown baseline report compares closed-book and web-search calibration runs.
-- [ ] Report includes task identity, model, agent, tools, success, quality, cost, latency, tokens, and citations.
-- [ ] Report includes observed takeaways and known limitations.
-- [ ] Report is saved under `docs/calibration/` or another documented non-ignored path.
-- [ ] Raw `runs/` artifacts remain ignored by git unless explicitly requested otherwise.
+- [x] A markdown baseline report compares closed-book and web-search calibration runs.
+- [x] Report includes task identity, model, agent, tools, success, quality, cost, latency, tokens, and citations.
+- [x] Report includes observed takeaways and known limitations.
+- [x] Report is saved under `docs/calibration/` or another documented non-ignored path.
+- [x] Raw `runs/` artifacts remain ignored by git unless explicitly requested otherwise.
 
 ### Detailed Technical Instructions
 
@@ -325,7 +325,13 @@ Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_budg
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `docs/calibration/assistantbench-gpt-5.4-nano-calibration.md`.
+
+Published a durable baseline report comparing the one-task closed-book and OpenRouter-native-web-search AssistantBench calibration runs. The report records the commands used, raw artifact locations, run suite IDs, git commit, task ID, expected answer, agent, requested/returned model, configured tools, success/quality outcomes, latency, token usage, estimated cost, and citation metadata.
+
+The report captures the main finding: web search was configured and cited sources correctly, but for this task it increased total tokens from `259` to `18,356` and estimated cost from `$0.00024255` to `$0.0338095395` while still failing the exact-answer check. Known limitations include brittle exact-match evaluation, missing scaffold identity, and the fact that this is a one-task calibration rather than a stable model ranking.
+
+Raw `runs/` artifacts remain gitignored. Verification completed with `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `49 passed`.
 
 ---
 

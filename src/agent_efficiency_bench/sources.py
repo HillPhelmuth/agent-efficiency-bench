@@ -155,6 +155,58 @@ def normalize_terminal_bench_task(task_id: str, yaml_text: str, source_url: str 
     )
 
 
+def normalize_tau2_bench(row: dict[str, Any], domain: str) -> BenchmarkTask:
+    task_id = str(row.get("id") or hashlib.sha1(json.dumps(row, sort_keys=True).encode()).hexdigest()[:12])
+    instructions = ((row.get("user_scenario") or {}).get("instructions") or {})
+    criteria = row.get("evaluation_criteria") or {}
+    actions = criteria.get("actions") or []
+    instruction_parts = [
+        instructions.get("task_instructions"),
+        instructions.get("reason_for_call"),
+        instructions.get("known_info"),
+        instructions.get("unknown_info"),
+    ]
+    instruction = "\n\n".join(str(part).strip() for part in instruction_parts if part)
+    if not instruction:
+        instruction = f"Complete tau2-bench {domain} task {task_id}."
+    typical_calls = max(len(actions), 1)
+    return BenchmarkTask(
+        task_id=f"tau2_bench_{domain}__{task_id}",
+        source="sierra-research/tau2-bench",
+        source_type="github",
+        source_url=f"https://github.com/sierra-research/tau2-bench/tree/main/data/tau2/domains/{domain}",
+        category="tool_workflow",
+        domain=domain,
+        instruction=instruction,
+        environment={
+            "type": "simulated_user_tools",
+            "domain": domain,
+            "source_repo": "sierra-research/tau2-bench",
+            "license": "MIT",
+        },
+        complexity=Complexity(
+            horizon=_horizon_from_tool_calls(typical_calls),
+            interaction_type="simulated_user_tool_workflow",
+            expected_tool_calls_typical=typical_calls,
+            expected_human_minutes=max(10, typical_calls * 3),
+            ambiguity="high",
+            requires_planning=True,
+            requires_memory=True,
+            requires_policy_following=True,
+            requires_recovery=True,
+        ),
+        budgets=Budget(max_wall_clock_seconds=1800, max_total_tokens=400_000, max_estimated_usd=6.0, max_tool_calls=120, max_llm_calls=80),
+        success_criteria=SuccessCriteria(type="tau2_actions", checker="tau2_harness", notes="tau2 evaluation criteria include target DB/action/NL assertion outcomes."),
+        tags=["tool-workflow", "simulated-user", "policy", "public", "mit", domain],
+        raw={
+            "id": task_id,
+            "domain": domain,
+            "evaluation_criteria": criteria,
+            "description": row.get("description"),
+        },
+    )
+
+
 def load_huggingface_subset(spec: dict[str, Any]) -> list[BenchmarkTask]:
     ds = load_dataset(spec["dataset_id"], split=spec.get("split", "train"))
     sample_size = int(spec.get("sample_size", 10))
@@ -202,6 +254,19 @@ def load_terminal_bench_github_subset(spec: dict[str, Any]) -> list[BenchmarkTas
     return tasks
 
 
+def load_tau2_bench_github_subset(spec: dict[str, Any]) -> list[BenchmarkTask]:
+    repo = spec.get("repo", "sierra-research/tau2-bench")
+    branch = spec.get("branch", "main")
+    domain = spec.get("domain", "retail")
+    url = f"{RAW_GITHUB}/{repo}/{branch}/data/tau2/domains/{domain}/tasks.json"
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    rows = response.json()
+    sample_size = int(spec.get("sample_size", 10))
+    sampled_rows = _stable_sample(rows, sample_size, lambda row: row.get("id") or json.dumps(row, sort_keys=True)[:200])
+    return [normalize_tau2_bench(dict(row), domain=domain) for row in sampled_rows]
+
+
 def load_source(spec: dict[str, Any]) -> list[BenchmarkTask]:
     source_type = spec["type"]
     if source_type == "huggingface":
@@ -210,6 +275,8 @@ def load_source(spec: dict[str, Any]) -> list[BenchmarkTask]:
         return load_huggingface_jsonl_subset(spec)
     if source_type == "github_terminal_bench":
         return load_terminal_bench_github_subset(spec)
+    if source_type == "github_tau2_bench":
+        return load_tau2_bench_github_subset(spec)
     raise ValueError(f"unsupported source type: {source_type}")
 
 

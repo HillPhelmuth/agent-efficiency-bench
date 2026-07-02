@@ -64,6 +64,7 @@ See `docs/openrouter.md` and `docs/running-benchmarks.md` for full details.
 - `SWE-bench/SWE-bench_Lite` from Hugging Face — software engineering issue-resolution tasks.
 - `AssistantBench/AssistantBench` from Hugging Face — realistic web research tasks.
 - `harbor-framework/terminal-bench` from GitHub — terminal/container tasks sampled from task YAML files.
+- `sierra-research/tau2-bench` from GitHub — MIT-licensed conversational tool/policy workflow tasks sampled from retail and airline domain JSON files.
 
 The extractor intentionally takes only small subsets. This repository stores normalized metadata/instructions, not heavyweight benchmark environments.
 

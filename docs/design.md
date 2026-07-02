@@ -19,12 +19,12 @@ The initial subset is intentionally small for fast iteration:
 1. 8 SWE-bench Lite tasks for coding/terminal issue resolution.
 2. 8 AssistantBench dev tasks for open-web research.
 3. 8 Terminal-Bench task YAMLs for terminal/container workflows.
+4. 8 tau2-bench tasks for conversational tool/policy workflows, split across retail and airline domains.
 
 The subset is deterministic via SHA-256 ordering of stable row IDs, not random sampling. This makes repeated builds reproducible while avoiding large downloads.
 
 ## Next adapters to add
 
-- τ³-bench / tau2-bench conversational tool workflows.
 - WorkArena / BrowserGym browser enterprise workflows.
 - MCP-Bench or MCP-Universe tool-server workflows.
 - OSWorld desktop/computer-use tasks.

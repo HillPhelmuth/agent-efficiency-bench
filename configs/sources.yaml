@@ -22,3 +22,19 @@ sources:
     branch: main
     sample_size: 8
     normalizer: terminal_bench
+
+  - name: tau2_bench_retail
+    type: github_tau2_bench
+    repo: sierra-research/tau2-bench
+    branch: main
+    domain: retail
+    sample_size: 4
+    normalizer: tau2_bench
+
+  - name: tau2_bench_airline
+    type: github_tau2_bench
+    repo: sierra-research/tau2-bench
+    branch: main
+    domain: airline
+    sample_size: 4
+    normalizer: tau2_bench

@@ -335,16 +335,16 @@ Raw `runs/` artifacts remain gitignored. Verification completed with `PYTHONPATH
 
 ---
 
-## [ ] Task 8: Add tau-bench/tau-style tool workflow source adapter
+## [x] Task 8: Add tau-bench/tau-style tool workflow source adapter
 
 ### Acceptance Criteria
 
-- [ ] Add a small deterministic public subset for conversational tool/policy workflows.
-- [ ] Normalize tasks into existing `BenchmarkTask` schema.
-- [ ] Assign category such as `tool_workflow` or another consistent category.
-- [ ] Add source config entry.
-- [ ] Add tests for source normalization.
-- [ ] `aeb build-subset` and `aeb catalog` include the new source.
+- [x] Add a small deterministic public subset for conversational tool/policy workflows.
+- [x] Normalize tasks into existing `BenchmarkTask` schema.
+- [x] Assign category such as `tool_workflow` or another consistent category.
+- [x] Add source config entry.
+- [x] Add tests for source normalization.
+- [x] `aeb build-subset` and `aeb catalog` include the new source.
 
 ### Detailed Technical Instructions
 
@@ -369,7 +369,15 @@ Raw `runs/` artifacts remain gitignored. Verification completed with `PYTHONPATH
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/sources.py`, `configs/sources.yaml`, `tests/test_normalizers.py`, `tests/test_tau2_source.py`, `README.md`, `docs/design.md`, and regenerated `data/tasks/public_efficiency_subset.jsonl`.
+
+Research found that the original `sierra-research/tau-bench` repository is MIT licensed but its README marks the tasks as outdated and recommends `sierra-research/tau2-bench` / τ³-bench instead. The adapter therefore uses the newer MIT-licensed `sierra-research/tau2-bench` JSON task sources under `data/tau2/domains/<domain>/tasks.json`.
+
+Added `normalize_tau2_bench(row, domain)` and `load_tau2_bench_github_subset(spec)`. The normalizer maps tau2 rows into `BenchmarkTask` with stable task IDs like `tau2_bench_retail__55`, source `sierra-research/tau2-bench`, category `tool_workflow`, domain `retail` or `airline`, environment metadata `{type: simulated_user_tools, source_repo: sierra-research/tau2-bench, license: MIT}`, complexity labels for simulated user/tool workflows, and `tau2_actions` success criteria checked by a future `tau2_harness`.
+
+Updated `configs/sources.yaml` with two deterministic 4-task entries: `tau2_bench_retail` and `tau2_bench_airline`. Rebuilt the public subset; `aeb build-subset` wrote 32 tasks and `aeb catalog` now reports 8 tasks each for `software_engineering`, `web_research`, `terminal_work`, and `tool_workflow`, including source `sierra-research/tau2-bench` with count 8.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tau2_source.py tests/test_normalizers.py -q`, `PYTHONPATH= uv run python -m pytest -q`, and `PYTHONPATH= uv run aeb build-subset --config configs/sources.yaml --output data/tasks/public_efficiency_subset.jsonl && PYTHONPATH= uv run aeb catalog data/tasks/public_efficiency_subset.jsonl`; the full suite passed with `51 passed`.
 
 ---
 

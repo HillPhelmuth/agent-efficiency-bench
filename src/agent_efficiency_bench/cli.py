@@ -25,6 +25,7 @@ from agent_efficiency_bench.reporting import summarize_by_category, summarize_by
 from agent_efficiency_bench.runner import BenchmarkRunner
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
+from agent_efficiency_bench.task_audit import audit_tasks as audit_task_rows, format_audit_markdown
 
 app = typer.Typer(help="Agentic efficiency benchmark tooling.")
 console = Console()
@@ -185,6 +186,24 @@ def report(
         summary = summarize_by_dimensions(task_lookup, run_rows, dimensions, manifests=manifests)
     write_markdown_report(output, summary)
     console.print(f"[green]Wrote report[/green] to {output}")
+
+
+@app.command("audit-tasks")
+def audit_tasks(
+    tasks: str = typer.Argument(..., help="Normalized task JSONL path."),
+    output: str | None = typer.Option(None, help="Optional Markdown output path."),
+    min_instruction_chars: int = typer.Option(20, help="Warn on instructions shorter than this many characters."),
+) -> None:
+    """Audit a normalized task JSONL file for coverage and weak evaluator signals."""
+    task_rows = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
+    audit = audit_task_rows(task_rows, min_instruction_chars=min_instruction_chars)
+    markdown = format_audit_markdown(audit)
+    if output:
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        Path(output).write_text(markdown, encoding="utf-8")
+        console.print(f"[green]Wrote task audit[/green] to {output}")
+    else:
+        console.print(markdown)
 
 
 def _manifest_lookup(manifest: str | None, runs: list[RunTelemetry]) -> dict[str, dict]:

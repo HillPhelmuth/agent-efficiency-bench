@@ -14,7 +14,13 @@ PYTHONPATH= uv run aeb build-subset \
   --output data/tasks/public_efficiency_subset.jsonl
 
 PYTHONPATH= uv run aeb catalog data/tasks/public_efficiency_subset.jsonl
+
+PYTHONPATH= uv run aeb audit-tasks \
+  data/tasks/public_efficiency_subset.jsonl \
+  --output docs/calibration/task-audit.md
 ```
+
+The audit command reports task counts by source/category/horizon/interaction/success criteria and flags weak evaluator or instruction signals.
 
 The current subset is intentionally small: 8 SWE-bench Lite tasks, 8 AssistantBench tasks, and 8 Terminal-Bench metadata tasks.
 

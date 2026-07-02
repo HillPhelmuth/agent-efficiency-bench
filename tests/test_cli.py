@@ -44,3 +44,17 @@ def test_report_cli_accepts_group_by_dimensions(tmp_path):
 
     assert result.exit_code == 0
     assert "tools_enabled=true" in report.read_text(encoding="utf-8")
+
+
+def test_audit_tasks_cli_writes_task_audit(tmp_path):
+    tasks = tmp_path / "tasks.jsonl"
+    output = tmp_path / "audit.md"
+    tasks.write_text(
+        '{"task_id":"t1","source":"AssistantBench","source_type":"huggingface","category":"web_research","instruction":"Q?","environment":{},"complexity":{"horizon":"short"},"success_criteria":{"type":"manual"}}\n',
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["audit-tasks", str(tasks), "--output", str(output)])
+
+    assert result.exit_code == 0
+    assert "# Task Audit" in output.read_text(encoding="utf-8")

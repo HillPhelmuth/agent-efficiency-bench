@@ -205,15 +205,15 @@ Tests cover audit counts, warning generation, markdown formatting, and CLI outpu
 
 ---
 
-## [ ] Task 5: Build a structured web-research evaluator
+## [x] Task 5: Build a structured web-research evaluator
 
 ### Acceptance Criteria
 
-- [ ] Add a deterministic structured evaluator for web-research tasks.
-- [ ] Evaluator supports exact text fields, numeric tolerances, required domains/URLs, and citation checks.
-- [ ] Evaluator returns `EvaluationScore` with useful failure reasons and details.
-- [ ] AssistantBench or custom web tasks can opt into this evaluator via `success_criteria` and/or `raw` metadata.
-- [ ] Tests cover success, partial failure, numeric tolerance, and missing citation cases.
+- [x] Add a deterministic structured evaluator for web-research tasks.
+- [x] Evaluator supports exact text fields, numeric tolerances, required domains/URLs, and citation checks.
+- [x] Evaluator returns `EvaluationScore` with useful failure reasons and details.
+- [x] AssistantBench or custom web tasks can opt into this evaluator via `success_criteria` and/or `raw` metadata.
+- [x] Tests cover success, partial failure, numeric tolerance, and missing citation cases.
 
 ### Detailed Technical Instructions
 
@@ -243,7 +243,13 @@ Tests cover audit counts, warning generation, markdown formatting, and CLI outpu
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/evaluators/structured.py`, `src/agent_efficiency_bench/harnesses/assistantbench.py`, `tests/test_structured_evaluator.py`, and `tests/test_assistantbench_harness.py`.
+
+Added `StructuredAnswerEvaluator`, a deterministic evaluator for web-research answers. It supports `text_contains`, numeric checks with tolerances, required citation domains/URLs, and `requires_citation`. It returns an `EvaluationScore` with `checks`, `passed_checks`, and `total_checks` details, using partial quality scores when only some checks pass.
+
+Structured evaluator inputs are read from `task.raw["expected"]`, for example `{"text_contains": ["Potash Markets"], "numbers": [{"label": "price", "value": 15.0, "tolerance": 0.25}], "required_domains": ["potashmarkets.com"], "requires_citation": true}`. AssistantBench evaluator selection now prefers this structured metadata when present, then falls back to exact `raw.answer`, then `NoOpEvaluator`.
+
+Tests cover full success, partial text failure, numeric tolerance success, missing citation failure, and AssistantBench dispatch to the structured evaluator. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_structured_evaluator.py tests/test_assistantbench_harness.py -q` and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `47 passed`.
 
 ---
 

@@ -419,15 +419,15 @@ Tests cover default answer-only telemetry, web-search scaffold telemetry, manife
 
 ---
 
-## [ ] Task 10: Design and implement a minimal multi-step tool-loop agent
+## [x] Task 10: Design and implement a minimal multi-step tool-loop agent
 
 ### Acceptance Criteria
 
-- [ ] Add a minimal ReAct-style or tool-loop scaffold separate from answer-only mode.
-- [ ] Agent records every LLM call and tool/server-tool configuration in traces.
-- [ ] Agent respects budget checks from Task 6.
-- [ ] Agent produces comparable `RunTelemetry` and `RunResult` artifacts.
-- [ ] Tests use a fake provider/tool path and do not spend tokens.
+- [x] Add a minimal ReAct-style or tool-loop scaffold separate from answer-only mode.
+- [x] Agent records every LLM call and tool/server-tool configuration in traces.
+- [x] Agent respects budget checks from Task 6.
+- [x] Agent produces comparable `RunTelemetry` and `RunResult` artifacts.
+- [x] Tests use a fake provider/tool path and do not spend tokens.
 
 ### Detailed Technical Instructions
 
@@ -452,4 +452,10 @@ Tests cover default answer-only telemetry, web-search scaffold telemetry, manife
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/agents/openrouter_tool_loop.py`, `src/agent_efficiency_bench/cli.py`, `tests/test_tool_loop_agent.py`, `tests/test_cli.py`, `README.md`, `docs/running-benchmarks.md`, and `plan-state.md`.
+
+Added `OpenRouterToolLoopAgent`, a minimal two-step scaffold with scaffold identity `react-tool-loop`. The agent makes a research LLM call first, optionally passing configured OpenRouter server tools such as `openrouter:web_search`, emits `llm_call_start`, `llm_call_end`, and `budget_check`, and stops early with `budget_exceeded` if the research call exceeds task budgets. If budget remains, it makes a second final synthesis LLM call without tools, records the same trace events, and returns a comparable `RunResult` with `output.answer`, `output.research`, `RunTelemetry`, trace path, and artifact directory.
+
+Added CLI command `run-tool-loop` with the same task/model/category/limit/output/max-token shape as `run-answer`, plus `--enable-web-search` for the research step. Documentation now explains when to use answer-only versus the tool-loop scaffold: answer-only is the cheapest single-call baseline, while tool-loop is for measuring scaffold overhead and research/synthesis quality gains.
+
+Tests use fake provider responses only: one test verifies the two-call research/final flow, token/cost aggregation, scaffold identity, tool passing only on the research call, and exact trace event sequence; another verifies early budget termination after the research step. CLI registration is also tested. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tool_loop_agent.py -q`, `PYTHONPATH= uv run python -m pytest tests/test_tool_loop_agent.py tests/test_cli.py -q`, and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `56 passed`.

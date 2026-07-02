@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
+from agent_efficiency_bench.agents.openrouter_tool_loop import OpenRouterToolLoopAgent
 from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import (
     AssistantBenchEvaluator,
@@ -88,6 +89,28 @@ def run_answer(
     selected = select_tasks(loaded_tasks, category=category, limit=limit)
     tools = [native_web_search_tool()] if enable_web_search else None
     agent = OpenRouterAnswerAgent(
+        config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
+    )
+    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir, tasks_path=tasks)
+    results = runner.run_tasks(selected)
+    console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
+
+
+@app.command("run-tool-loop")
+def run_tool_loop(
+    tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
+    model: str = typer.Option(..., help="OpenRouter model id, e.g. openai/gpt-4o-mini."),
+    category: str | None = typer.Option(None, help="Optional task category filter."),
+    limit: int | None = typer.Option(None, help="Maximum tasks to run."),
+    output_dir: str = typer.Option("runs/tool-loop", help="Output directory for traces and JSONL results."),
+    max_completion_tokens: int = typer.Option(2048, help="Per-call max completion tokens."),
+    enable_web_search: bool = typer.Option(False, help="Pass native web_search tool configuration on the research step."),
+) -> None:
+    """Run a minimal multi-step OpenRouter tool-loop scaffold."""
+    loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
+    selected = select_tasks(loaded_tasks, category=category, limit=limit)
+    tools = [native_web_search_tool()] if enable_web_search else None
+    agent = OpenRouterToolLoopAgent(
         config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
     )
     runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir, tasks_path=tasks)

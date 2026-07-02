@@ -65,6 +65,23 @@ runs/smoke/run_telemetry.jsonl
 runs/smoke/<task_id>/trace.jsonl
 ```
 
+## 4a. Run the minimal tool-loop scaffold
+
+Use `run-tool-loop` when you want a comparable multi-step scaffold: one research call, budget check, then one final synthesis call. With `--enable-web-search`, only the research step receives OpenRouter's native web-search server tool; the final step synthesizes from the research notes without tools.
+
+```bash
+PYTHONPATH= uv run aeb run-tool-loop \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --model openai/gpt-5.4-nano \
+  --category web_research \
+  --limit 1 \
+  --output-dir runs/tool-loop-smoke \
+  --max-completion-tokens 256 \
+  --enable-web-search
+```
+
+Use `run-answer` for the cheapest single-call baseline. Use `run-tool-loop` when comparing scaffold overhead and whether a research/synthesis loop improves answer quality enough to justify the additional LLM call.
+
 ## 5. Run AssistantBench tasks
 
 Closed-book baseline:

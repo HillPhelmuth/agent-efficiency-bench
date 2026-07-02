@@ -58,3 +58,10 @@ def test_audit_tasks_cli_writes_task_audit(tmp_path):
 
     assert result.exit_code == 0
     assert "# Task Audit" in output.read_text(encoding="utf-8")
+
+
+def test_run_tool_loop_cli_is_registered():
+    result = CliRunner().invoke(app, ["run-tool-loop", "--help"])
+
+    assert result.exit_code == 0
+    assert "Run a minimal multi-step OpenRouter tool-loop scaffold" in result.output

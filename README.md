@@ -46,6 +46,18 @@ PYTHONPATH= uv run aeb run-answer \
   --max-completion-tokens 256
 ```
 
+Run the minimal two-call tool-loop scaffold when you want to compare a research/synthesis loop against answer-only behavior:
+
+```bash
+PYTHONPATH= uv run aeb run-tool-loop \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --model openai/gpt-4o-mini \
+  --category web_research \
+  --limit 1 \
+  --output-dir runs/tool-loop-smoke \
+  --max-completion-tokens 256
+```
+
 Add `--enable-web-search` for tasks that require OpenRouter's native `openrouter:web_search` server tool.
 
 Generate a report:

@@ -19,6 +19,7 @@ class OpenRouterAnswerAgent:
         self.config = config
         self.client = client or OpenRouterClient()
         self.model = config.model
+        self.scaffold = _scaffold_name(config.tools)
 
     def run(self, task: BenchmarkTask, artifact_dir: str | Path) -> RunResult:
         artifact_path = Path(artifact_dir)
@@ -81,6 +82,7 @@ class OpenRouterAnswerAgent:
             task_id=task.task_id,
             agent=self.name,
             model=response.model or self.model,
+            scaffold=self.scaffold,
             success=False,
             quality_score=0.0,
             terminated_by=termination,
@@ -103,6 +105,13 @@ def _tool_names(tools: list[dict] | None) -> list[str]:
         else:
             names.append(str(tool.get("type") or "unknown"))
     return names
+
+
+def _scaffold_name(tools: list[dict] | None) -> str:
+    tool_names = set(_tool_names(tools))
+    if "openrouter:web_search" in tool_names:
+        return "web-search-answer"
+    return "answer-only"
 
 
 def _budget_check_data(budget: BudgetTracker, termination: str | None) -> dict:

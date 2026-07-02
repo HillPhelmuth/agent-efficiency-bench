@@ -53,6 +53,7 @@ def test_answer_agent_returns_output_and_usage(tmp_path):
     assert result.telemetry.input_tokens == 20
     assert result.telemetry.output_tokens == 5
     assert result.telemetry.estimated_usd == 0.01
+    assert result.telemetry.scaffold == "answer-only"
     assert result.telemetry.success is False
     assert result.trace_path.endswith("trace.jsonl")
 
@@ -69,6 +70,15 @@ def test_answer_agent_passes_configured_tools_to_openrouter(tmp_path):
 
     assert client.calls[0]["tools"] == [tool]
     assert client.calls[0]["tool_choice"] == "auto"
+
+
+def test_answer_agent_uses_web_search_scaffold_when_openrouter_web_search_configured(tmp_path):
+    tool = {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+    agent = OpenRouterAnswerAgent(client=FakeClient(), config=ModelConfig(model="openai/gpt-5.4-nano", tools=[tool]))
+
+    result = agent.run(make_task(requires_external_search=True), artifact_dir=tmp_path)
+
+    assert result.telemetry.scaffold == "web-search-answer"
 
 
 def test_answer_agent_traces_configured_tools_and_response_annotations(tmp_path):

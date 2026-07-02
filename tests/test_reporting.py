@@ -75,3 +75,26 @@ def test_summarize_by_dimensions_falls_back_to_tools_disabled_without_manifest()
     summary = summarize_by_dimensions(tasks, runs, ["tools_enabled"])
 
     assert "tools_enabled=false" in summary
+
+
+def test_summarize_by_dimensions_groups_by_scaffold():
+    tasks = {"t1": {"category": "web_research", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            scaffold="web-search-answer",
+            success=True,
+            quality_score=1.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+        )
+    ]
+
+    summary = summarize_by_dimensions(tasks, runs, ["scaffold"])
+
+    assert "scaffold=web-search-answer" in summary

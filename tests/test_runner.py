@@ -6,6 +6,7 @@ from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, Mo
 class FakeAgent:
     name = "fake-agent"
     model = "fake-model"
+    scaffold = "fake-scaffold"
     config = ModelConfig(model="fake-model", tools=[{"type": "openrouter:web_search"}])
 
     def run(self, task, artifact_dir):
@@ -68,6 +69,7 @@ def test_runner_writes_manifest_with_agent_model_tools_and_tasks(tmp_path):
     assert manifest["run_suite_id"] == "suite-test"
     assert manifest["agent"] == "fake-agent"
     assert manifest["model"] == "fake-model"
+    assert manifest["scaffold"] == "fake-scaffold"
     assert manifest["tools_configured"] == ["openrouter:web_search"]
     assert manifest["task_ids"] == ["t1"]
     assert manifest["budget"] == {

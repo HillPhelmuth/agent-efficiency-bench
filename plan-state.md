@@ -381,14 +381,14 @@ Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tau2
 
 ---
 
-## [ ] Task 9: Add scaffold identity and scaffold comparison support
+## [x] Task 9: Add scaffold identity and scaffold comparison support
 
 ### Acceptance Criteria
 
-- [ ] Run telemetry and manifests clearly distinguish model from scaffold.
-- [ ] At least two scaffold modes can be compared in reports.
-- [ ] Existing `openrouter-answer` behavior remains unchanged.
-- [ ] Tests cover scaffold identity in telemetry, manifest, and reporting.
+- [x] Run telemetry and manifests clearly distinguish model from scaffold.
+- [x] At least two scaffold modes can be compared in reports.
+- [x] Existing `openrouter-answer` behavior remains unchanged.
+- [x] Tests cover scaffold identity in telemetry, manifest, and reporting.
 
 ### Detailed Technical Instructions
 
@@ -409,7 +409,13 @@ Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tau2
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/agents/openrouter_answer.py`, `src/agent_efficiency_bench/runner.py`, `tests/test_answer_agent.py`, `tests/test_runner.py`, `tests/test_reporting.py`, and `docs/running-benchmarks.md`.
+
+`OpenRouterAnswerAgent` now sets a scaffold identity independent of the model name: `answer-only` for the plain answer baseline and `web-search-answer` when the OpenRouter native `openrouter:web_search` server tool is configured. The scaffold value is written into `RunTelemetry.scaffold` for every answer-agent run.
+
+`BenchmarkRunner` now writes `scaffold` into `manifest.json`, so run identity includes agent, model, scaffold, and configured tools. Reporting already supported `scaffold` grouping from Task 3; a regression test now verifies `summarize_by_dimensions(..., ["scaffold"])` groups by scaffold value.
+
+Tests cover default answer-only telemetry, web-search scaffold telemetry, manifest scaffold serialization, and reporting group-by-scaffold behavior. Documentation now notes that manifests include scaffold metadata. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_answer_agent.py tests/test_runner.py tests/test_reporting.py -q` and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `53 passed`.
 
 ---
 

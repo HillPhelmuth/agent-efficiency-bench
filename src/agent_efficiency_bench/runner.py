@@ -74,6 +74,7 @@ class BenchmarkRunner:
             output_dir=str(self.output_dir),
             tasks_path=self.tasks_path,
             task_ids=self.task_ids,
+            scaffold=getattr(self.agent, "scaffold", None),
             tools_configured=_tool_names(getattr(config, "tools", None)),
             budget=_budget_summary(self.budgets),
             git_commit=_git_commit(),

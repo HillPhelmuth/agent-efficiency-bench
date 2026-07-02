@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -31,6 +34,7 @@ class BenchmarkRunner:
         self.tasks_path = tasks_path
         self.run_suite_id = run_suite_id or f"suite-{uuid.uuid4().hex[:12]}"
         self.task_ids: list[str] = []
+        self.budgets: list[dict[str, Any]] = []
 
     def run_task(self, task: BenchmarkTask) -> RunResult:
         artifact_dir = self.output_dir / task.task_id
@@ -43,6 +47,7 @@ class BenchmarkRunner:
         result.output["evaluation"] = score.model_dump(exclude_none=True)
         self._append_result(result)
         self.task_ids.append(task.task_id)
+        self.budgets.append(task.budgets.model_dump())
         self._write_manifest()
         return result
 
@@ -70,7 +75,9 @@ class BenchmarkRunner:
             tasks_path=self.tasks_path,
             task_ids=self.task_ids,
             tools_configured=_tool_names(getattr(config, "tools", None)),
+            budget=_budget_summary(self.budgets),
             git_commit=_git_commit(),
+            environment=_environment_info(),
         )
         self.manifest_path.write_text(manifest.model_dump_json(exclude_none=True, indent=2), encoding="utf-8")
 
@@ -92,6 +99,32 @@ def _tool_names(tools: list[dict[str, Any]] | None) -> list[str]:
         else:
             names.append(str(tool.get("type") or "unknown"))
     return names
+
+
+def _budget_summary(budgets: list[dict[str, Any]]) -> dict[str, Any]:
+    if not budgets:
+        return {}
+    if all(budget == budgets[0] for budget in budgets):
+        return budgets[0]
+    keys = sorted({key for budget in budgets for key in budget})
+    summary: dict[str, Any] = {"task_count": len(budgets), "per_field": {}}
+    for key in keys:
+        values = [budget.get(key) for budget in budgets if key in budget]
+        if values and all(isinstance(value, (int, float)) for value in values):
+            summary["per_field"][key] = {"min": min(values), "max": max(values)}
+        else:
+            summary["per_field"][key] = {"values": sorted({str(value) for value in values})}
+    return summary
+
+
+def _environment_info() -> dict[str, Any]:
+    return {
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "cwd": os.getcwd(),
+        "git_commit": _git_commit(),
+        "command": " ".join(sys.argv) if sys.argv else None,
+    }
 
 
 def _git_commit() -> str | None:

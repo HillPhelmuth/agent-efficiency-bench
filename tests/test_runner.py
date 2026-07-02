@@ -70,3 +70,15 @@ def test_runner_writes_manifest_with_agent_model_tools_and_tasks(tmp_path):
     assert manifest["model"] == "fake-model"
     assert manifest["tools_configured"] == ["openrouter:web_search"]
     assert manifest["task_ids"] == ["t1"]
+    assert manifest["budget"] == {
+        "max_wall_clock_seconds": 900,
+        "max_total_tokens": 200000,
+        "max_estimated_usd": 2.0,
+        "max_tool_calls": 80,
+        "max_llm_calls": 40,
+    }
+    assert manifest["environment"]["python_version"]
+    assert manifest["environment"]["platform"]
+    assert manifest["environment"]["cwd"]
+    assert "git_commit" in manifest["environment"]
+    assert "command" in manifest["environment"]

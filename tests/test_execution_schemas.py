@@ -30,9 +30,13 @@ def test_run_manifest_records_reproducibility_context():
         tools_configured=["openrouter:web_search"],
         task_ids=["t1"],
         git_commit="abc123",
+        budget={"max_total_tokens": 200000},
+        environment={"python_version": "3.13.0", "platform": "test"},
     )
     assert manifest.tools_configured == ["openrouter:web_search"]
     assert manifest.task_ids == ["t1"]
+    assert manifest.budget["max_total_tokens"] == 200000
+    assert manifest.environment["python_version"] == "3.13.0"
 
 
 def test_run_result_wraps_existing_telemetry():

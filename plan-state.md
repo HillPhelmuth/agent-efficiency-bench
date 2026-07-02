@@ -65,14 +65,14 @@ Telemetry gaps captured: manifest `budget` and `environment` are empty; `RunTele
 
 ---
 
-## [ ] Task 2: Fill `RunManifest.budget` and `RunManifest.environment`
+## [x] Task 2: Fill `RunManifest.budget` and `RunManifest.environment`
 
 ### Acceptance Criteria
 
-- [ ] `manifest.json` includes non-empty budget information for the executed run suite.
-- [ ] `manifest.json` includes environment information useful for reproducing runs.
-- [ ] Existing manifest tests assert budget and environment fields are populated.
-- [ ] Existing tests continue to pass.
+- [x] `manifest.json` includes non-empty budget information for the executed run suite.
+- [x] `manifest.json` includes environment information useful for reproducing runs.
+- [x] Existing manifest tests assert budget and environment fields are populated.
+- [x] Existing tests continue to pass.
 
 ### Detailed Technical Instructions
 
@@ -95,7 +95,13 @@ Telemetry gaps captured: manifest `budget` and `environment` are empty; `RunTele
 
 ### Implementation Details
 
-<provide details when task is completed>
+Implemented in `src/agent_efficiency_bench/runner.py`, `tests/test_runner.py`, `tests/test_execution_schemas.py`, and `docs/running-benchmarks.md`.
+
+`BenchmarkRunner` now accumulates each executed task's budget metadata and writes it into `manifest.json`. When all executed tasks share the same budget, the manifest stores that budget directly. When budgets differ, the manifest writes a summary containing `task_count` and per-field min/max values for numeric budget fields.
+
+The manifest environment now includes `python_version`, `platform`, `cwd`, `git_commit`, and the invoking `command` when available. `RunManifest` tests now cover non-empty budget/environment fields, and runner tests assert the generated manifest contains the default task budget plus environment reproduction fields.
+
+Documentation in `docs/running-benchmarks.md` now states that `manifest.json` includes budget and environment metadata. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_runner.py tests/test_execution_schemas.py -q` and `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `36 passed`.
 
 ---
 

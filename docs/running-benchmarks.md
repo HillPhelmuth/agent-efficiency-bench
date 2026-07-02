@@ -92,7 +92,7 @@ PYTHONPATH= uv run aeb report \
   --output runs/smoke/report.md
 ```
 
-Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, task file path, and configured tools. Trace files also record configured tools on `llm_call_start` and response annotations/citations on `llm_call_end` when OpenRouter returns them.
+Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, task file path, configured tools, budget metadata, and environment metadata. Trace files also record configured tools on `llm_call_start` and response annotations/citations on `llm_call_end` when OpenRouter returns them.
 
 ## 6a. Two-mode AssistantBench calibration
 

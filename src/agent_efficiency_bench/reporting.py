@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import json
 import statistics
 from pathlib import Path
 from typing import Any
@@ -76,19 +78,36 @@ def _summary_for_runs(runs: list[RunTelemetry]) -> dict[str, Any]:
     aggregate = aggregate_runs(runs).model_dump()
     costs = [run.estimated_usd for run in runs]
     latencies = [run.wall_clock_seconds for run in runs]
+    tool_calls = [run.num_tool_calls for run in runs]
+    successful_runs = [run for run in runs if run.success]
+    successful_count = len(successful_runs)
+    budget_exceeded_runs = [run for run in runs if str(run.terminated_by or "").startswith("budget_") or str(run.terminated_by or "").startswith("suite_budget_")]
+    unevaluated_runs = [run for run in runs if run.terminated_by == "not_evaluated"]
+    server_tool_enabled_runs = [run for run in runs if run.server_tools_configured]
     aggregate.update(
         {
+            "evaluated_runs": len(runs) - len(unevaluated_runs),
+            "unevaluated_runs": len(unevaluated_runs),
+            "unevaluated_rate": len(unevaluated_runs) / len(runs) if runs else 0.0,
+            "budget_exceeded_runs": len(budget_exceeded_runs),
+            "budget_exceeded_rate": len(budget_exceeded_runs) / len(runs) if runs else 0.0,
             "p50_cost_usd": _percentile(costs, 0.50),
+            "median_cost_usd": _percentile(costs, 0.50),
             "p95_cost_usd": _percentile(costs, 0.95),
             "p50_latency_seconds": _percentile(latencies, 0.50),
+            "median_latency_seconds": _percentile(latencies, 0.50),
             "p95_latency_seconds": _percentile(latencies, 0.95),
             "mean_cost_usd": statistics.mean(costs) if costs else 0.0,
             "stdev_cost_usd": statistics.stdev(costs) if len(costs) > 1 else 0.0,
             "stdev_latency_seconds": statistics.stdev(latencies) if len(latencies) > 1 else 0.0,
             "stdev_total_tokens": statistics.stdev([run.total_tokens for run in runs]) if len(runs) > 1 else 0.0,
             "stdev_quality": statistics.stdev([run.quality_score for run in runs]) if len(runs) > 1 else 0.0,
+            "mean_tool_calls": statistics.mean(tool_calls) if tool_calls else 0.0,
+            "tool_calls_per_success": sum(tool_calls) / successful_count if successful_count else None,
             "retry_rate": sum(run.num_retries for run in runs) / len(runs) if runs else 0.0,
             "error_rate": sum(1 for run in runs if run.num_errors > 0) / len(runs) if runs else 0.0,
+            "server_tools_enabled_runs": len(server_tool_enabled_runs),
+            "server_tools_enabled_rate": len(server_tool_enabled_runs) / len(runs) if runs else 0.0,
             "total_citations": sum(run.num_citations for run in runs),
             "avg_citations": sum(run.num_citations for run in runs) / len(runs) if runs else 0.0,
             "total_annotations": sum(run.num_annotations for run in runs),
@@ -121,3 +140,29 @@ def write_markdown_report(output: str | Path, summary: dict[str, dict[str, Any]]
             if metric in values:
                 lines.append(f"| {group} | {metric} | {values[metric]} |")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_json_report(output: str | Path, summary: dict[str, dict[str, Any]]) -> None:
+    path = Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_csv_report(output: str | Path, summary: dict[str, dict[str, Any]]) -> None:
+    path = Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = summary_rows(summary)
+    fieldnames = ["group", *sorted({key for row in rows for key in row if key != "group"})]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def summary_rows(summary: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for group, values in sorted(summary.items()):
+        row = {"group": group}
+        row.update(values)
+        rows.append(row)
+    return rows

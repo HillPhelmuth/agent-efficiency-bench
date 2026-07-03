@@ -48,6 +48,55 @@ def test_report_cli_accepts_group_by_dimensions(tmp_path):
     assert "tools_enabled=true" in report.read_text(encoding="utf-8")
 
 
+def test_report_cli_writes_json_and_csv_formats(tmp_path):
+    tasks = tmp_path / "tasks.jsonl"
+    runs = tmp_path / "run_telemetry.jsonl"
+    report_json = tmp_path / "report.json"
+    report_csv = tmp_path / "report.csv"
+    tasks.write_text(
+        '{"task_id":"t1","source":"AssistantBench","source_type":"huggingface","category":"web_research","instruction":"Q?","environment":{},"complexity":{"horizon":"short"},"success_criteria":{"type":"manual"}}\n',
+        encoding="utf-8",
+    )
+    runs.write_text(
+        '{"run_id":"r1","task_id":"t1","agent":"openrouter-answer","model":"openai/gpt-5.4-nano","success":false,"quality_score":0.0,"wall_clock_seconds":1.0,"input_tokens":1,"output_tokens":1,"estimated_usd":0.01,"terminated_by":"not_evaluated"}\n',
+        encoding="utf-8",
+    )
+
+    json_result = CliRunner().invoke(
+        app,
+        [
+            "report",
+            "--tasks",
+            str(tasks),
+            "--runs",
+            str(runs),
+            "--output",
+            str(report_json),
+            "--format",
+            "json",
+        ],
+    )
+    csv_result = CliRunner().invoke(
+        app,
+        [
+            "report",
+            "--tasks",
+            str(tasks),
+            "--runs",
+            str(runs),
+            "--output",
+            str(report_csv),
+            "--format",
+            "csv",
+        ],
+    )
+
+    assert json_result.exit_code == 0
+    assert csv_result.exit_code == 0
+    assert '"unevaluated_runs": 1' in report_json.read_text(encoding="utf-8")
+    assert "unevaluated_runs" in report_csv.read_text(encoding="utf-8")
+
+
 def test_audit_tasks_cli_writes_task_audit(tmp_path):
     tasks = tmp_path / "tasks.jsonl"
     output = tmp_path / "audit.md"

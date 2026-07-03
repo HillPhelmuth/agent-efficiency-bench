@@ -1,4 +1,12 @@
-from agent_efficiency_bench.reporting import summarize_by_category, summarize_by_dimensions, write_markdown_report
+import json
+
+from agent_efficiency_bench.reporting import (
+    summarize_by_category,
+    summarize_by_dimensions,
+    write_csv_report,
+    write_json_report,
+    write_markdown_report,
+)
 from agent_efficiency_bench.schemas import RunTelemetry
 
 
@@ -167,3 +175,59 @@ def test_summarize_by_dimensions_includes_citation_and_annotation_totals():
 
     assert summary["category=web_research"]["total_citations"] == 2
     assert summary["category=web_research"]["total_annotations"] == 3
+
+
+def test_summarize_by_dimensions_labels_unevaluated_and_budget_exceeded_runs():
+    tasks = {"t1": {"category": "web_research", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            success=False,
+            quality_score=0.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+            terminated_by="not_evaluated",
+        ),
+        RunTelemetry(
+            run_id="r2",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            success=False,
+            quality_score=0.0,
+            wall_clock_seconds=12,
+            input_tokens=120,
+            output_tokens=30,
+            estimated_usd=0.11,
+            terminated_by="budget_tokens",
+        ),
+    ]
+
+    summary = summarize_by_dimensions(tasks, runs, ["category"])
+
+    assert summary["category=web_research"]["unevaluated_runs"] == 1
+    assert summary["category=web_research"]["budget_exceeded_runs"] == 1
+    assert summary["category=web_research"]["evaluated_runs"] == 1
+
+
+def test_write_json_report_serializes_grouped_summary(tmp_path):
+    output = tmp_path / "report.json"
+    write_json_report(output, {"web_research": {"total_runs": 1, "success_rate": 1.0}})
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["web_research"]["total_runs"] == 1
+    assert payload["web_research"]["success_rate"] == 1.0
+
+
+def test_write_csv_report_serializes_grouped_summary(tmp_path):
+    output = tmp_path / "report.csv"
+    write_csv_report(output, {"web_research": {"total_runs": 1, "success_rate": 1.0, "unevaluated_runs": 0}})
+
+    text = output.read_text(encoding="utf-8")
+    assert "group,total_runs,success_rate,unevaluated_runs" in text or "group,success_rate,total_runs,unevaluated_runs" in text
+    assert "web_research" in text

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agent_efficiency_bench.agents.openrouter_answer import (
     _budget_check_data,
+    _provider_response_metadata,
     _response_annotations,
     _response_citations,
     _tool_names,
@@ -179,7 +180,11 @@ class OpenRouterToolLoopAgent:
         )
         return RunResult(
             telemetry=telemetry,
-            output={"answer": answer, "research": research},
+            output={
+                "answer": answer,
+                "research": research,
+                "provider_response": _provider_response_metadata(response),
+            },
             trace_path=str(trace_path),
             artifact_dir=str(artifact_path),
         )

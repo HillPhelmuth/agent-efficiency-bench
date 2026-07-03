@@ -31,11 +31,19 @@ def test_run_manifest_records_reproducibility_context():
         task_ids=["t1"],
         git_commit="abc123",
         budget={"max_total_tokens": 200000},
+        source_revisions={"AssistantBench/AssistantBench": {"revision": "dev"}},
+        evaluator={"name": "RegistryEvaluator", "package_version": "0.1.0"},
+        harness={"identity": "unknown", "version": "unknown"},
+        provider={"requested_provider": "openrouter", "requested_model": "openai/gpt-5.4-nano"},
         environment={"python_version": "3.13.0", "platform": "test"},
     )
     assert manifest.tools_configured == ["openrouter:web_search"]
     assert manifest.task_ids == ["t1"]
     assert manifest.budget["max_total_tokens"] == 200000
+    assert manifest.source_revisions["AssistantBench/AssistantBench"]["revision"] == "dev"
+    assert manifest.evaluator["name"] == "RegistryEvaluator"
+    assert manifest.harness["identity"] == "unknown"
+    assert manifest.provider["requested_provider"] == "openrouter"
     assert manifest.environment["python_version"] == "3.13.0"
 
 

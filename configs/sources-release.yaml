@@ -1,11 +1,11 @@
-# Default dev subset definition for local benchmark iteration.
-# Keep counts low enough for routine comparison runs.
+# Larger release subset definition for more stable local comparisons.
+# Keep the counts moderate enough to remain practical while increasing coverage beyond dev.
 sources:
   - name: swe_bench_lite
     type: huggingface
     dataset_id: SWE-bench/SWE-bench_Lite
     split: test
-    sample_size: 8
+    sample_size: 16
     normalizer: swe_bench
 
   - name: assistantbench_dev
@@ -13,14 +13,14 @@ sources:
     dataset_id: AssistantBench/AssistantBench
     url: https://huggingface.co/datasets/AssistantBench/AssistantBench/resolve/main/assistant_bench_v1.0_dev.jsonl
     split: dev
-    sample_size: 8
+    sample_size: 16
     normalizer: assistantbench
 
   - name: terminal_bench_github
     type: github_terminal_bench
     repo: harbor-framework/terminal-bench
     branch: main
-    sample_size: 8
+    sample_size: 16
     normalizer: terminal_bench
 
   - name: tau2_bench_retail
@@ -28,7 +28,7 @@ sources:
     repo: sierra-research/tau2-bench
     branch: main
     domain: retail
-    sample_size: 4
+    sample_size: 8
     normalizer: tau2_bench
 
   - name: tau2_bench_airline
@@ -36,5 +36,5 @@ sources:
     repo: sierra-research/tau2-bench
     branch: main
     domain: airline
-    sample_size: 4
+    sample_size: 8
     normalizer: tau2_bench

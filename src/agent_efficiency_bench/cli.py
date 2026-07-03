@@ -30,7 +30,13 @@ from agent_efficiency_bench.harnesses.terminal_bench import (
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
-from agent_efficiency_bench.reporting import summarize_by_category, summarize_by_dimensions, write_markdown_report
+from agent_efficiency_bench.reporting import (
+    summarize_by_category,
+    summarize_by_dimensions,
+    write_csv_report,
+    write_json_report,
+    write_markdown_report,
+)
 from agent_efficiency_bench.runner import BenchmarkRunner, SuiteBudgetConfig
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
@@ -339,11 +345,12 @@ def run_tau2_official(
 def report(
     tasks: str = typer.Option("data/tasks/public_efficiency_subset.jsonl", help="Normalized task JSONL path."),
     runs: str = typer.Option(..., help="Run telemetry JSONL path."),
-    output: str = typer.Option(..., help="Markdown report output path."),
+    output: str = typer.Option(..., help="Report output path."),
     group_by: str = typer.Option("category", help="Comma-separated grouping dimensions."),
     manifest: str | None = typer.Option(None, help="Optional run manifest JSON path for tool metadata."),
+    format: str = typer.Option("markdown", help="Output format: markdown, json, or csv."),
 ) -> None:
-    """Generate a Markdown efficiency report grouped by selected dimensions."""
+    """Generate an efficiency report grouped by selected dimensions."""
     task_rows = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     run_rows = [RunTelemetry.model_validate(row) for row in read_jsonl(runs)]
     task_lookup = {task.task_id: task.model_dump() for task in task_rows}
@@ -353,7 +360,14 @@ def report(
     else:
         manifests = _manifest_lookup(manifest, run_rows)
         summary = summarize_by_dimensions(task_lookup, run_rows, dimensions, manifests=manifests)
-    write_markdown_report(output, summary)
+    if format == "markdown":
+        write_markdown_report(output, summary)
+    elif format == "json":
+        write_json_report(output, summary)
+    elif format == "csv":
+        write_csv_report(output, summary)
+    else:
+        raise typer.BadParameter("format must be one of: markdown, json, csv")
     console.print(f"[green]Wrote report[/green] to {output}")
 
 

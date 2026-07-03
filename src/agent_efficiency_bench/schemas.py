@@ -136,6 +136,10 @@ class RunManifest(BaseModel):
     tools_configured: list[str] = Field(default_factory=list)
     budget: dict[str, Any] = Field(default_factory=dict)
     suite_budget: dict[str, Any] = Field(default_factory=dict)
+    source_revisions: dict[str, Any] = Field(default_factory=dict)
+    evaluator: dict[str, Any] = Field(default_factory=dict)
+    harness: dict[str, Any] = Field(default_factory=dict)
+    provider: dict[str, Any] = Field(default_factory=dict)
     git_commit: str | None = None
     environment: dict[str, Any] = Field(default_factory=dict)
 

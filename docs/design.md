@@ -59,19 +59,31 @@ This separation is intentional: v0 reporting should not present local answer-onl
 
 ## Next adapters to add
 
-- WorkArena / BrowserGym browser enterprise workflows.
-- MCP-Bench or MCP-Universe tool-server workflows.
-- OSWorld desktop/computer-use tasks.
+The following adapter families are explicitly `post-v0`. v0 stays focused on the four currently scaffolded source categories and their existing evaluator or official-harness result paths.
+
+| adapter | status | reason | prerequisites |
+|---|---|---|---|
+| WorkArena / BrowserGym | post-v0 | Adds browser-environment orchestration, enterprise workflow fixtures, and browser-action evaluation surfaces that are outside the current four-source v0 contract. | Stable browser harness integration, environment provisioning, browser trace schema, and evaluation mapping into common result fields. |
+| MCP-Bench / MCP-Universe | post-v0 | Adds tool-server and MCP-session coordination that would require new environment setup, tool availability contracts, and likely new telemetry semantics beyond the current v0 adapters. | Pinned upstream suite choice, MCP server lifecycle management, tool/server capability manifests, and normalized evaluation output. |
+| OSWorld | post-v0 | Adds desktop/computer-use execution surfaces with heavier runtime dependencies and different action/observation loops than the current web, terminal, and tool-workflow slices. | Desktop automation environment, reproducible VM/container story, action trace normalization, and official evaluation ingestion. |
+
+They are excluded from v0 completion because none is required to make the current default dev subset benchmarkable end to end, and each would substantially widen the environment and evaluation surface beyond the present harness guarantees.
 
 ## Recommended leaderboard columns
 
 - success_rate
 - mean_quality
+- unevaluated_runs
+- budget_exceeded_runs
 - median_cost_usd
+- p95_cost_usd
 - cost_per_success
+- mean_tool_calls
+- tool_calls_per_success
+- server_tools_enabled_rate
 - median_latency_seconds
 - p95_latency_seconds
 - tokens_per_success
-- tool_calls_per_success
 - retry_rate
+- error_rate
 - Pareto frontier: quality vs. cost/time/tokens

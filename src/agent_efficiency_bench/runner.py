@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from agent_efficiency_bench import __version__
 from agent_efficiency_bench.agents.base import Agent
 from agent_efficiency_bench.evaluators.base import Evaluator
 from agent_efficiency_bench.io import write_jsonl
@@ -57,6 +58,9 @@ class BenchmarkRunner:
         self.suite_terminated_by: str | None = None
         self.requested_trial_count = 1
         self.executed_trial_indices: set[int] = set()
+        self.completed_tasks: list[BenchmarkTask] = []
+        self.provider_observations: list[dict[str, Any]] = []
+        self.harness_observations: list[dict[str, Any]] = []
 
     def run_task(self, task: BenchmarkTask, trial_index: int | None = None) -> RunResult:
         artifact_dir = self.output_dir / task.task_id
@@ -78,8 +82,11 @@ class BenchmarkRunner:
         self._append_result(result)
         self.task_ids.append(task.task_id)
         self.budgets.append(task.budgets.model_dump())
+        self.completed_tasks.append(task)
         if trial_index is not None:
             self.executed_trial_indices.add(trial_index)
+        self._record_provider_result(result)
+        self._record_harness_result(task, result)
         self._record_suite_result(result)
         self._write_manifest()
         return result
@@ -127,6 +134,10 @@ class BenchmarkRunner:
             tools_configured=_tool_names(getattr(config, "tools", None)),
             budget=_budget_summary(self.budgets),
             suite_budget=self._suite_budget_summary(),
+            source_revisions=_source_revision_summary(self.completed_tasks),
+            evaluator=_evaluator_info(self.evaluator),
+            harness=_harness_info(self.completed_tasks, self.harness_observations),
+            provider=_provider_info(self.agent, self.provider_observations),
             git_commit=_git_commit(),
             environment=_environment_info(),
         )
@@ -140,6 +151,33 @@ class BenchmarkRunner:
         reason = self._suite_limit_reason()
         if reason is not None:
             self.suite_terminated_by = reason
+
+    def _record_provider_result(self, result: RunResult) -> None:
+        provider_data = result.output.get("provider_response")
+        if isinstance(provider_data, dict):
+            self.provider_observations.append(provider_data)
+
+    def _record_harness_result(self, task: BenchmarkTask, result: RunResult) -> None:
+        harness_result = result.output.get("harness_result")
+        if isinstance(harness_result, dict):
+            observation = {
+                "checker": task.success_criteria.checker or task.success_criteria.type,
+                "source": task.source,
+                "status": harness_result.get("status"),
+            }
+            details = harness_result.get("details")
+            if isinstance(details, dict):
+                for key in ("harness", "harness_version", "version"):
+                    value = details.get(key)
+                    if value is not None:
+                        observation[key] = value
+            raw = harness_result.get("raw")
+            if isinstance(raw, dict):
+                for key in ("harness", "harness_version", "version"):
+                    value = raw.get(key)
+                    if value is not None:
+                        observation[key] = value
+            self.harness_observations.append(observation)
 
     def _suite_elapsed_seconds(self) -> float:
         return self.time_fn() - self.suite_started_at
@@ -210,6 +248,154 @@ def _budget_summary(budgets: list[dict[str, Any]]) -> dict[str, Any]:
         else:
             summary["per_field"][key] = {"values": sorted({str(value) for value in values})}
     return summary
+
+
+def _source_revision_summary(tasks: list[BenchmarkTask]) -> dict[str, Any]:
+    if not tasks:
+        return {}
+    summary: dict[str, dict[str, Any]] = {}
+    for task in tasks:
+        source_entry = summary.setdefault(
+            task.source,
+            {
+                "source_type": task.source_type,
+                "source_url": task.source_url,
+                "revision": "unknown",
+                "details": {},
+            },
+        )
+        if source_entry.get("source_url") is None and task.source_url is not None:
+            source_entry["source_url"] = task.source_url
+        details = source_entry["details"]
+        env = task.environment or {}
+
+        split = env.get("split")
+        if split:
+            details["split"] = split
+
+        if task.source == "SWE-bench/SWE-bench_Lite":
+            _append_unique(details, "repos", env.get("repo"))
+            _append_unique(details, "base_commits", env.get("base_commit"))
+            _append_unique(details, "versions", env.get("version"))
+            if details.get("base_commits") or details.get("versions"):
+                source_entry["revision"] = "per_task"
+        elif task.source == "AssistantBench/AssistantBench":
+            source_entry["revision"] = details.get("split") or "unknown"
+        elif task.source in {"harbor-framework/terminal-bench", "sierra-research/tau2-bench"}:
+            repo, revision = _github_source_identity(task)
+            if repo:
+                details["repo"] = repo
+            if revision:
+                source_entry["revision"] = revision
+            elif source_entry["revision"] == "unknown":
+                source_entry["revision"] = "unknown"
+
+    for entry in summary.values():
+        if not entry["details"]:
+            entry.pop("details")
+    return summary
+
+
+def _github_source_identity(task: BenchmarkTask) -> tuple[str | None, str | None]:
+    source_url = task.source_url or ""
+    if "raw.githubusercontent.com/" in source_url:
+        parts = source_url.split("raw.githubusercontent.com/", 1)[1].split("/")
+        if len(parts) >= 3:
+            return f"{parts[0]}/{parts[1]}", parts[2]
+    if "github.com/" in source_url and "/tree/" in source_url:
+        tail = source_url.split("github.com/", 1)[1]
+        repo_part, _, rest = tail.partition("/tree/")
+        revision = rest.split("/", 1)[0] if rest else None
+        return repo_part or None, revision or None
+    repo = task.environment.get("source_repo") if isinstance(task.environment, dict) else None
+    return repo, None
+
+
+def _append_unique(container: dict[str, Any], key: str, value: Any) -> None:
+    if value in (None, ""):
+        return
+    values = container.setdefault(key, [])
+    if value not in values:
+        values.append(value)
+
+
+def _evaluator_info(evaluator: Evaluator) -> dict[str, Any]:
+    info = {
+        "name": evaluator.__class__.__name__,
+        "package_version": __version__,
+        "checker": getattr(evaluator, "checker_name", None),
+        "source": getattr(evaluator, "source", None),
+    }
+    return {key: value for key, value in info.items() if value is not None}
+
+
+def _harness_info(tasks: list[BenchmarkTask], observations: list[dict[str, Any]]) -> dict[str, Any]:
+    required_checkers = sorted(
+        {
+            checker
+            for task in tasks
+            for checker in [task.success_criteria.checker or task.success_criteria.type]
+            if checker in {"swebench_harness", "terminal_bench_harness", "tau2_harness"}
+        }
+    )
+    if not required_checkers and not observations:
+        return {}
+
+    observed = []
+    for observation in observations:
+        observed.append(
+            {
+                "checker": observation.get("checker") or "unknown",
+                "source": observation.get("source") or "unknown",
+                "identity": observation.get("harness") or observation.get("checker") or "unknown",
+                "version": observation.get("harness_version") or observation.get("version") or "unknown",
+                "status": observation.get("status") or "unknown",
+            }
+        )
+
+    return {
+        "required_checkers": required_checkers,
+        "observed": observed,
+        "identity": observed[0]["identity"] if len(observed) == 1 else ("multiple" if observed else "unknown"),
+        "version": observed[0]["version"] if len(observed) == 1 else ("multiple" if observed else "unknown"),
+    }
+
+
+def _provider_info(agent: Agent, observations: list[dict[str, Any]]) -> dict[str, Any]:
+    config = getattr(agent, "config", None)
+    requested_provider = getattr(config, "provider", None) or "unknown"
+    requested_model = getattr(config, "model", None) or getattr(agent, "model", None) or "unknown"
+    returned_models = sorted(
+        {
+            str(value)
+            for observation in observations
+            for value in [observation.get("returned_model")]
+            if value
+        }
+    )
+    upstream_providers = sorted(
+        {
+            str(value)
+            for observation in observations
+            for value in [observation.get("provider")]
+            if value
+        }
+    )
+    routes = sorted(
+        {
+            json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value)
+            for observation in observations
+            for value in [observation.get("route") or observation.get("routing")]
+            if value is not None
+        }
+    )
+    return {
+        "requested_provider": requested_provider,
+        "requested_model": requested_model,
+        "returned_models": returned_models,
+        "upstream_providers": upstream_providers,
+        "routes": routes,
+    }
 
 
 def _environment_info() -> dict[str, Any]:

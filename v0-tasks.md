@@ -530,15 +530,15 @@ Added focused regression coverage in `tests/test_runner.py`, `tests/test_reporti
 
 ---
 
-## [ ] Task 12: Add benchmark provenance metadata to manifests
+## [x] Task 12: Add benchmark provenance metadata to manifests
 
 ### Acceptance Criteria
 
-- [ ] `manifest.json` records dataset/source revision metadata when available.
-- [ ] `manifest.json` records evaluator identity/version or checker identity.
-- [ ] `manifest.json` records harness identity/version for official harness paths.
-- [ ] OpenRouter returned model/provider metadata is preserved where available.
-- [ ] Tests verify new manifest fields are populated or explicitly null/unknown.
+- [x] `manifest.json` records dataset/source revision metadata when available.
+- [x] `manifest.json` records evaluator identity/version or checker identity.
+- [x] `manifest.json` records harness identity/version for official harness paths.
+- [x] OpenRouter returned model/provider metadata is preserved where available.
+- [x] Tests verify new manifest fields are populated or explicitly null/unknown.
 
 ### Detailed Technical Instructions
 
@@ -564,19 +564,25 @@ Added focused regression coverage in `tests/test_runner.py`, `tests/test_reporti
 
 ### Implementation Details
 
-_To be filled in after completion._
+Extended `RunManifest` in `src/agent_efficiency_bench/schemas.py` with `source_revisions`, `evaluator`, `harness`, and `provider` fields. These now serialize alongside the existing suite, budget, and environment metadata so each run directory records benchmark provenance in one place.
+
+Updated `src/agent_efficiency_bench/runner.py` so manifest writing derives provenance from the actual executed tasks and results. The runner now aggregates per-source revision hints from task URLs and environment metadata, records evaluator identity from the active evaluator class plus package version, records required/observed harness identity and version for official-harness-backed tasks, and preserves provider provenance from any `provider_response` metadata attached to run results. When a revision or harness version is not knowable, the manifest records `unknown` explicitly instead of fabricating values.
+
+Updated the OpenRouter answer and tool-loop agents to attach a small `provider_response` payload to run output, preserving the returned model plus any upstream provider or routing metadata present in the raw OpenRouter response. Returned model identity continues to live in `RunTelemetry.model`; the new manifest `provider` block aggregates these observations at the suite level.
+
+Added focused coverage in `tests/test_execution_schemas.py` and `tests/test_runner.py` for the new schema fields and manifest serialization, including explicit `unknown` handling and observed harness/provider metadata. Updated `docs/openrouter.md` and `docs/running-benchmarks.md` to describe the new provenance fields. Verified with `uv run python -m pytest tests/test_execution_schemas.py tests/test_runner.py -q` and `uv run python -m pytest -q`.
 
 ---
 
-## [ ] Task 13: Add release/dev subset configuration support
+## [x] Task 13: Add release/dev subset configuration support
 
 ### Acceptance Criteria
 
-- [ ] The project supports separate source configs for smoke, dev, and release subsets.
-- [ ] The default quick-start remains cheap and fast.
-- [ ] Documentation explains when to use each config.
-- [ ] Tests or smoke commands verify all configs can be parsed.
-- [ ] Full test suite passes.
+- [x] The project supports separate source configs for smoke, dev, and release subsets.
+- [x] The default quick-start remains cheap and fast.
+- [x] Documentation explains when to use each config.
+- [x] Tests or smoke commands verify all configs can be parsed.
+- [x] Full test suite passes.
 
 ### Detailed Technical Instructions
 
@@ -600,19 +606,25 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Added `configs/sources-smoke.yaml`, `configs/sources-dev.yaml`, and `configs/sources-release.yaml`. The smoke config keeps one task per configured source for cheap validation, the dev config preserves the existing 32-task local v0 slice, and the release config increases sample sizes conservatively for more stable comparisons. `configs/sources.yaml` remains in place as a compatibility alias for the dev config so existing commands do not break.
+
+Updated `README.md` and `docs/running-benchmarks.md` to steer first-time users toward the smoke config, normal local comparisons toward the dev config, and larger comparison runs toward the release config. The quick-start now keeps the initial path cheap while still showing how to build the default dev subset.
+
+Added `tests/test_source_configs.py` to verify that all three named configs parse, expose the expected source names and source types, and increase sample sizes monotonically from smoke to dev to release. This keeps the verification path local and non-networked while still guarding the config split.
+
+Verified with `uv run python -m pytest tests/test_source_configs.py -q` and `uv run python -m pytest -q`.
 
 ---
 
-## [ ] Task 14: Improve reporting for leaderboard-style comparisons
+## [x] Task 14: Improve reporting for leaderboard-style comparisons
 
 ### Acceptance Criteria
 
-- [ ] Reports include success rate, mean quality, median/p95 latency, median/p95 cost, cost per success, tokens per success, retry/error rates, and tool/server-tool metadata.
-- [ ] Reports can be written as Markdown and machine-readable JSON or CSV.
-- [ ] Reports clearly label unevaluated and budget-exceeded runs.
-- [ ] Reports support grouping by category, source, model, scaffold, tools, horizon, and trial index where applicable.
-- [ ] Tests cover Markdown and JSON/CSV output.
+- [x] Reports include success rate, mean quality, median/p95 latency, median/p95 cost, cost per success, tokens per success, retry/error rates, and tool/server-tool metadata.
+- [x] Reports can be written as Markdown and machine-readable JSON or CSV.
+- [x] Reports clearly label unevaluated and budget-exceeded runs.
+- [x] Reports support grouping by category, source, model, scaffold, tools, horizon, and trial index where applicable.
+- [x] Tests cover Markdown and JSON/CSV output.
 
 ### Detailed Technical Instructions
 
@@ -646,19 +658,23 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Expanded `src/agent_efficiency_bench/reporting.py` so grouped summaries now include median and p95 cost/latency, retry and error rates, mean local tool calls, `tool_calls_per_success`, server-tool enablement counts/rates, and explicit `unevaluated_runs` plus `budget_exceeded_runs`. Existing success-gated accounting remains unchanged: failed and budget-exceeded runs still contribute to spend, token, and latency totals, while success-gated metrics only divide by successful runs.
+
+Added `write_json_report(...)` and `write_csv_report(...)` alongside the existing Markdown writer, and extended `aeb report` in `src/agent_efficiency_bench/cli.py` with `--format markdown|json|csv`. Grouping support remains driven by `summarize_by_dimensions(...)`, which already supports category, source, model, scaffold, tools, horizon, and trial index dimensions.
+
+Added focused coverage in `tests/test_reporting.py` and `tests/test_cli.py` for Markdown/JSON/CSV output, grouped summaries, server-tool fallback behavior, variance fields, and explicit unevaluated or budget-exceeded labeling. Updated `README.md`, `docs/design.md`, and `docs/running-benchmarks.md` with the new leaderboard columns and report-format examples. Verified with `uv run python -m pytest tests/test_reporting.py tests/test_cli.py -q` and `uv run python -m pytest -q`.
 
 ---
 
-## [ ] Task 15: Add non-token-spending end-to-end CLI smoke tests
+## [x] Task 15: Add non-token-spending end-to-end CLI smoke tests
 
 ### Acceptance Criteria
 
-- [ ] A single test or script verifies build-subset, audit, fake-provider run, manifest generation, and report generation without real OpenRouter calls.
-- [ ] CI/local tests do not require `OPENROUTER_API_KEY`.
-- [ ] The smoke path creates and cleans temporary outputs.
-- [ ] Documentation tells contributors how to run the smoke verification.
-- [ ] Full test suite passes.
+- [x] A single test or script verifies build-subset, audit, fake-provider run, manifest generation, and report generation without real OpenRouter calls.
+- [x] CI/local tests do not require `OPENROUTER_API_KEY`.
+- [x] The smoke path creates and cleans temporary outputs.
+- [x] Documentation tells contributors how to run the smoke verification.
+- [x] Full test suite passes.
 
 ### Detailed Technical Instructions
 
@@ -682,19 +698,23 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Extended `tests/test_integration_fake_provider.py` with a single CLI smoke test that monkeypatches source loading and the answer agent so no network calls or OpenRouter credentials are required. The test now drives `build-subset`, `audit-tasks`, `run-answer`, and `report` through `CliRunner`, then verifies that the subset file, task audit, run telemetry, `manifest.json`, and final report were all produced under temporary paths.
+
+This keeps the smoke path fully local and self-cleaning through `tmp_path`, while still exercising the actual CLI plumbing and the default runner/manifest/report code paths. The fake task uses deterministic expected metadata so the run can flow through the normal report path without introducing a separate special-case smoke command.
+
+Updated `README.md` and `docs/running-benchmarks.md` to point contributors at `uv run python -m pytest tests/test_integration_fake_provider.py -q` for the no-token smoke verification path. Verified with `uv run python -m pytest tests/test_cli.py tests/test_integration_fake_provider.py -q` and `uv run python -m pytest -q`.
 
 ---
 
-## [ ] Task 16: Rerun current-code AssistantBench calibration and replace stale reports
+## [x] Task 16: Rerun current-code AssistantBench calibration and replace stale reports
 
 ### Acceptance Criteria
 
-- [ ] New calibration artifacts are generated with current manifest budget/environment/scaffold fields.
-- [ ] A durable Markdown report under `docs/calibration/` summarizes the current-code calibration.
-- [ ] The report includes closed-book versus web-search and answer-only versus tool-loop where budget allows.
-- [ ] Raw `runs/` artifacts remain ignored unless explicitly requested.
-- [ ] Full test suite passes after docs are updated.
+- [x] New calibration artifacts are generated with current manifest budget/environment/scaffold fields.
+- [x] A durable Markdown report under `docs/calibration/` summarizes the current-code calibration.
+- [x] The report includes closed-book versus web-search and answer-only versus tool-loop where budget allows.
+- [x] Raw `runs/` artifacts remain ignored unless explicitly requested.
+- [x] Full test suite passes after docs are updated.
 
 ### Detailed Technical Instructions
 
@@ -725,19 +745,25 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Confirmed `OPENROUTER_API_KEY` was available, then ran three one-task current-code calibrations: closed-book AssistantBench answer-only, AssistantBench answer-only with native OpenRouter web search, and a one-task web-search tool-loop run over the `web_research` slice. The commands wrote fresh artifacts under `runs/calibration-current-closed-book`, `runs/calibration-current-web-search`, and `runs/calibration-current-tool-loop`.
+
+Inspected the resulting manifests, telemetry rows, and run outputs. All three runs preserved the current manifest fields added in earlier tasks, including `budget`, `suite_budget`, `environment`, `source_revisions`, `evaluator`, and `provider`. The requested model was `openai/gpt-5.4-nano`, and the observed returned model across runs was `openai/gpt-5.4-nano-20260317` from upstream provider `OpenAI`.
+
+Added `docs/calibration/assistantbench-current-calibration.md` summarizing the commands used and the observed current-code outcomes. In this spot check, closed-book was cheapest and fastest but failed the structured evaluation; answer-only web search increased cost and latency and returned one citation/annotation but still failed; the tool-loop web-search scaffold cost even more and also failed on the same task. The report explicitly notes that the raw `runs/` artifacts were generated for local inspection and are not required to be committed.
+
+Verified with `uv run python -m pytest -q` after the documentation update.
 
 ---
 
-## [ ] Task 17: Decide and document next benchmark adapters for v0 versus post-v0
+## [x] Task 17: Decide and document next benchmark adapters for v0 versus post-v0
 
 ### Acceptance Criteria
 
-- [ ] `docs/design.md` clearly labels WorkArena/BrowserGym, MCP-Bench/MCP-Universe, and OSWorld as v0 or post-v0.
-- [ ] If any are v0, there is a task section in this file with concrete implementation steps.
-- [ ] If they are post-v0, docs explain why they are excluded from v0 completion.
-- [ ] README does not imply unsupported adapters are currently available.
-- [ ] Existing tests continue to pass.
+- [x] `docs/design.md` clearly labels WorkArena/BrowserGym, MCP-Bench/MCP-Universe, and OSWorld as v0 or post-v0.
+- [x] If any are v0, there is a task section in this file with concrete implementation steps.
+- [x] If they are post-v0, docs explain why they are excluded from v0 completion.
+- [x] README does not imply unsupported adapters are currently available.
+- [x] Existing tests continue to pass.
 
 ### Detailed Technical Instructions
 
@@ -758,22 +784,26 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Updated `docs/design.md` so the former `Next adapters to add` bullet list is now an explicit table covering WorkArena/BrowserGym, MCP-Bench/MCP-Universe, and OSWorld. All three are marked `post-v0`, with reasons and prerequisite work spelled out in terms of environment setup, harness integration, telemetry normalization, and evaluation ingestion.
+
+This keeps v0 tightly scoped to the four current source families already represented in the default dev subset. None of the browser-enterprise, MCP-server, or desktop-use suites is required to make that subset benchmarkable end to end, and each would widen the harness surface significantly.
+
+Updated `README.md` so it does not imply these unsupported adapters are already scaffolded. Verified with `uv run python -m pytest -q`.
 
 ---
 
-## [ ] Task 18: Final v0 verification checklist
+## [x] Task 18: Final v0 verification checklist
 
 ### Acceptance Criteria
 
-- [ ] Full test suite passes.
-- [ ] Default dev subset builds successfully.
-- [ ] Task audit has no placeholder/template warnings.
-- [ ] Catalog matches documented counts.
-- [ ] Fake/no-token smoke path passes.
-- [ ] At least one evaluated run/report exists for each v0-included category, or docs explicitly mark the category as official-harness-required and not locally scored.
-- [ ] `README.md` quick start works as written.
-- [ ] `v0-tasks.md` has completed Implementation Details for every finished task.
+- [x] Full test suite passes.
+- [x] Default dev subset builds successfully.
+- [x] Task audit has no placeholder/template warnings.
+- [x] Catalog matches documented counts.
+- [x] Fake/no-token smoke path passes.
+- [x] At least one evaluated run/report exists for each v0-included category, or docs explicitly mark the category as official-harness-required and not locally scored.
+- [x] `README.md` quick start works as written.
+- [x] `v0-tasks.md` has completed Implementation Details for every finished task.
 
 ### Detailed Technical Instructions
 
@@ -797,4 +827,16 @@ _To be filled in after completion._
 
 ### Implementation Details
 
-_To be filled in after completion._
+Ran the full verification pass end to end:
+
+- `uv run python -m pytest -q` passed with `107 passed`.
+- `uv run aeb build-subset --config configs/sources.yaml --output data/tasks/public_efficiency_subset.jsonl` rebuilt the default dev subset and wrote `32` tasks.
+- `uv run aeb audit-tasks data/tasks/public_efficiency_subset.jsonl --output docs/calibration/task-audit.md` completed successfully, and the resulting audit report shows `No warnings`.
+- `uv run aeb catalog data/tasks/public_efficiency_subset.jsonl` reported the documented counts: `8` tasks each for `software_engineering`, `web_research`, `terminal_work`, and `tool_workflow`, with matching per-source totals.
+- `uv run python -m pytest tests/test_integration_fake_provider.py -q` passed, confirming the no-token smoke path.
+- `uv run aeb report --tasks data/tasks/public_efficiency_subset.jsonl --runs runs/calibration-current-closed-book/run_telemetry.jsonl --output runs/calibration-current-closed-book/report.md` generated a report from an available non-secret telemetry artifact.
+- `uv run aeb build-subset --config configs/sources-smoke.yaml --output data/tasks/public_efficiency_smoke.jsonl` also succeeded, confirming the smoke quick-start path from `README.md`.
+
+Re-read `README.md`, `docs/design.md`, and `docs/running-benchmarks.md` during this pass to confirm that the docs now consistently describe which categories are locally scored versus official-harness-required. `web_research` has evaluated local runs; `software_engineering`, `terminal_work`, and `tool_workflow` are explicitly documented as official-harness-backed or otherwise not locally benchmark-scored in generic runs unless harness results are attached.
+
+Completed `Implementation Details` are now present for every finished task in this file.

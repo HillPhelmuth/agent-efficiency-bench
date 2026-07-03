@@ -6,11 +6,23 @@
 PYTHONPATH= uv run python -m pytest -q
 ```
 
+For a no-token CLI smoke path that exercises subset build, audit, fake-provider execution, manifest generation, and report output without `OPENROUTER_API_KEY`, run:
+
+```bash
+PYTHONPATH= uv run python -m pytest tests/test_integration_fake_provider.py -q
+```
+
 ## 2. Build or inspect the public task subset
+
+First-time local validation should start with the smoke config:
 
 ```bash
 PYTHONPATH= uv run aeb build-subset \
-  --config configs/sources.yaml \
+  --config configs/sources-smoke.yaml \
+  --output data/tasks/public_efficiency_smoke.jsonl
+
+PYTHONPATH= uv run aeb build-subset \
+  --config configs/sources-dev.yaml \
   --output data/tasks/public_efficiency_subset.jsonl
 
 PYTHONPATH= uv run aeb catalog data/tasks/public_efficiency_subset.jsonl
@@ -20,7 +32,7 @@ PYTHONPATH= uv run aeb audit-tasks \
   --output docs/calibration/task-audit.md
 ```
 
-For v0, this dev subset is the default local benchmark slice. Smoke runs are smaller local validation paths, while official full benchmark harnesses remain separate from these local scaffold runs.
+For v0, `configs/sources-dev.yaml` is the default local benchmark slice and `configs/sources.yaml` remains a compatibility alias for that same config. `configs/sources-smoke.yaml` is the cheapest validation path, while `configs/sources-release.yaml` is the larger local comparison config once the workflow is stable. Official full benchmark harnesses remain separate from these local scaffold runs.
 
 By default, local `run-answer` and `run-tool-loop` executions now use task-aware evaluator selection. AssistantBench-style web-research tasks can be scored locally when expected metadata is present. SWE-bench, Terminal-Bench, and tau2 tasks remain explicitly `unevaluated` in these generic local runs unless official harness result metadata is attached and parsed.
 
@@ -131,16 +143,32 @@ PYTHONPATH= uv run aeb report \
 PYTHONPATH= uv run aeb report \
   --tasks data/tasks/public_efficiency_subset.jsonl \
   --runs runs/smoke/run_telemetry.jsonl \
+  --format json \
+  --output runs/smoke/report.json
+
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/smoke/run_telemetry.jsonl \
+  --format csv \
+  --output runs/smoke/report.csv
+
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/smoke/run_telemetry.jsonl \
   --manifest runs/smoke/manifest.json \
   --group-by category,model,tools_enabled,horizon,trial_index \
   --output runs/smoke/grouped-report.md
 ```
 
-Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, scaffold, task file path, configured tools, budget metadata, and environment metadata. Trace files also record configured tools on `llm_call_start` and response annotations/citations on `llm_call_end` when OpenRouter returns them.
+Each run output directory now includes a `manifest.json` with the run suite ID, git commit, task IDs, model, agent, scaffold, task file path, configured tools, budget metadata, environment metadata, and provenance metadata. Provenance fields include `source_revisions`, `evaluator`, `harness`, and `provider` so reports can preserve dataset/source revision hints, evaluator identity, official harness identity/version when present, and requested versus observed OpenRouter model/provider metadata.
+
+When exact upstream revisions are not available, manifests record `unknown` rather than inventing a revision. For GitHub-backed task sources, the manifest records branch-style revision hints when they can be derived from the source URL.
 
 Grouped reports can use those telemetry fields to distinguish runs that enabled provider-side search even when a manifest is unavailable.
 
 Repeated-trial summaries now also include simple variance signals such as standard deviation for cost, latency, total tokens, and quality. Use repeated trials for release-style model comparisons when budget allows; keep smoke checks at `--n-trials 1`.
+
+Report summaries now also surface `unevaluated_runs`, `budget_exceeded_runs`, median and p95 cost/latency, retry/error rates, mean local tool calls, `tool_calls_per_success`, and server-tool enablement rates. Failed and budget-exceeded runs still count toward aggregate spend, token, and latency totals; unevaluated runs are labeled explicitly instead of being mixed into benchmark-success claims.
 
 ## 6a. Two-mode AssistantBench calibration
 

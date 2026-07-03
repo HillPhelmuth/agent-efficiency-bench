@@ -17,7 +17,7 @@ v0 is the point where this repository becomes a credible local benchmark harness
 
 Included in v0:
 
-- A deterministic dev subset built from the public sources in `configs/sources.yaml` and written to `data/tasks/public_efficiency_subset.jsonl`.
+- A deterministic dev subset built from the public sources in `configs/sources-dev.yaml` and written to `data/tasks/public_efficiency_subset.jsonl`, with `configs/sources.yaml` kept as a compatibility alias.
 - A source adapter for every default source included in that dev subset.
 - End-to-end scoring for every source included in the default dev subset, either through a local evaluator or an official harness result parser.
 - Reports and manifests that distinguish evaluated runs from unevaluated runs and preserve benchmark provenance.
@@ -31,7 +31,7 @@ Excluded from v0:
 Benchmark tiers:
 
 - `smoke`: 1 task per selected source for fast local validation, fake-provider checks, and CLI sanity tests.
-- `dev`: the deterministic public subset under `configs/sources.yaml` and `data/tasks/public_efficiency_subset.jsonl`; this is the default v0 benchmark slice.
+- `dev`: the deterministic public subset under `configs/sources-dev.yaml` and `data/tasks/public_efficiency_subset.jsonl`; `configs/sources.yaml` points to the same configuration for compatibility.
 - `release`: a larger pinned subset intended for model and scaffold comparisons once the local workflow is stable.
 - `external/full`: official benchmark suites that require upstream harness setup and may run Docker, external environments, or paid model calls.
 
@@ -55,9 +55,12 @@ Current local scoring status:
 ```bash
 uv sync --extra dev
 PYTHONPATH= uv run python -m pytest -q
-PYTHONPATH= uv run aeb build-subset --config configs/sources.yaml --output data/tasks/public_efficiency_subset.jsonl
+PYTHONPATH= uv run aeb build-subset --config configs/sources-smoke.yaml --output data/tasks/public_efficiency_smoke.jsonl
+PYTHONPATH= uv run aeb build-subset --config configs/sources-dev.yaml --output data/tasks/public_efficiency_subset.jsonl
 PYTHONPATH= uv run aeb catalog data/tasks/public_efficiency_subset.jsonl
 ```
+
+Use `configs/sources-smoke.yaml` for first-time validation, `configs/sources-dev.yaml` for normal local comparisons, and `configs/sources-release.yaml` for larger repeated-trial comparisons.
 
 ## OpenRouter execution
 
@@ -108,9 +111,23 @@ PYTHONPATH= uv run aeb report \
   --tasks data/tasks/public_efficiency_subset.jsonl \
   --runs runs/smoke/run_telemetry.jsonl \
   --output runs/smoke/report.md
+
+PYTHONPATH= uv run aeb report \
+  --tasks data/tasks/public_efficiency_subset.jsonl \
+  --runs runs/smoke/run_telemetry.jsonl \
+  --format json \
+  --output runs/smoke/report.json
 ```
 
+Reports can now be emitted as Markdown, JSON, or CSV. The grouped summaries include success rate, mean quality, median and p95 cost/latency, cost per success, tokens per success, retry/error rates, server-tool usage signals, and explicit unevaluated or budget-exceeded counts.
+
 See `docs/openrouter.md` and `docs/running-benchmarks.md` for full details.
+
+For a no-token end-to-end smoke check that covers subset build, audit, fake-provider execution, manifest writing, and report generation, run:
+
+```bash
+PYTHONPATH= uv run python -m pytest tests/test_integration_fake_provider.py -q
+```
 
 ## Public sources currently scaffolded
 
@@ -121,10 +138,15 @@ See `docs/openrouter.md` and `docs/running-benchmarks.md` for full details.
 
 The extractor intentionally takes only small subsets. This repository stores normalized metadata/instructions, not heavyweight benchmark environments.
 
+Browser enterprise workflows such as WorkArena/BrowserGym, MCP-centric suites such as MCP-Bench or MCP-Universe, and desktop/computer-use suites such as OSWorld are not currently scaffolded here and remain post-v0 roadmap items.
+
 ## Repository layout
 
 ```text
-configs/sources.yaml                  # source selection and per-source sample sizes
+configs/sources-smoke.yaml            # 1 task per source for smoke validation
+configs/sources-dev.yaml              # default dev subset definition
+configs/sources-release.yaml          # larger release-style subset definition
+configs/sources.yaml                  # compatibility alias for configs/sources-dev.yaml
 data/tasks/                           # generated normalized task subsets
 src/agent_efficiency_bench/           # package code
 tests/                                # unit tests

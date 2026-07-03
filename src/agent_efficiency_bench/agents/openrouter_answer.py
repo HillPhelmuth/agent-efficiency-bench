@@ -96,7 +96,7 @@ class OpenRouterAnswerAgent:
         recorder.emit("task_end", data={"terminated_by": telemetry.terminated_by})
         return RunResult(
             telemetry=telemetry,
-            output={"answer": response.content},
+            output={"answer": response.content, "provider_response": _provider_response_metadata(response)},
             trace_path=str(trace_path),
             artifact_dir=str(artifact_path),
         )
@@ -155,3 +155,16 @@ def _response_citations(raw: dict) -> list[str]:
         if citation not in citations:
             citations.append(citation)
     return citations
+
+
+def _provider_response_metadata(response) -> dict:
+    raw = response.raw if isinstance(response.raw, dict) else {}
+    metadata = {
+        "generation_id": response.generation_id,
+        "returned_model": response.model,
+    }
+    for key in ("provider", "provider_name", "route", "routing"):
+        value = raw.get(key)
+        if value is not None:
+            metadata["provider" if key == "provider_name" else key] = value
+    return metadata

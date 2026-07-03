@@ -28,6 +28,17 @@ class FakeAgent:
         return RunResult(telemetry=telemetry, output={"answer": "ok"}, trace_path=str(artifact_dir / "trace.jsonl"))
 
 
+class FakeHarnessAgent(FakeAgent):
+    def run(self, task, artifact_dir):
+        result = super().run(task, artifact_dir)
+        result.output["harness_result"] = {
+            "success": True,
+            "status": "passed",
+            "details": {"harness": "fake-harness", "harness_version": "1.2.3"},
+        }
+        return result
+
+
 class FakeEvaluator:
     def evaluate(self, task, result):
         return EvaluationScore(success=True, quality_score=1.0, reason="ok")
@@ -111,11 +122,90 @@ def test_runner_writes_manifest_with_agent_model_tools_and_tasks(tmp_path):
         "terminated_by": None,
         "aborted": False,
     }
+    assert manifest["source_revisions"] == {
+        "manual": {
+            "source_type": "custom",
+            "source_url": None,
+            "revision": "unknown",
+        }
+    }
+    assert manifest["evaluator"]["name"] == "FakeEvaluator"
+    assert manifest["evaluator"]["package_version"]
+    assert manifest["harness"] == {}
+    assert manifest["provider"] == {
+        "requested_provider": "openrouter",
+        "requested_model": "fake-model",
+        "returned_models": [],
+        "upstream_providers": [],
+        "routes": [],
+    }
     assert manifest["environment"]["python_version"]
     assert manifest["environment"]["platform"]
     assert manifest["environment"]["cwd"]
     assert "git_commit" in manifest["environment"]
     assert "command" in manifest["environment"]
+
+
+def test_runner_writes_source_evaluator_harness_and_provider_provenance(tmp_path):
+    class OpenRouterLikeAgent(FakeHarnessAgent):
+        def run(self, task, artifact_dir):
+            result = super().run(task, artifact_dir)
+            result.output["provider_response"] = {
+                "generation_id": "gen-1",
+                "returned_model": "openai/gpt-5.4-nano-2026-06-01",
+                "provider": "OpenAI",
+                "route": "primary",
+            }
+            return result
+
+    task = BenchmarkTask(
+        task_id="swe_bench_lite__demo",
+        source="SWE-bench/SWE-bench_Lite",
+        source_type="huggingface",
+        source_url="https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite",
+        category="software_engineering",
+        instruction="Fix the bug",
+        environment={"type": "terminal", "repo": "pallets/flask", "base_commit": "abc123", "version": "1.0"},
+        complexity=Complexity(horizon="long"),
+        budgets=Budget(),
+        success_criteria=SuccessCriteria(type="unit_tests", checker="swebench_harness"),
+    )
+
+    runner = BenchmarkRunner(agent=OpenRouterLikeAgent(), evaluator=FakeEvaluator(), output_dir=tmp_path)
+    runner.run_task(task)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["source_revisions"]["SWE-bench/SWE-bench_Lite"] == {
+        "source_type": "huggingface",
+        "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite",
+        "revision": "per_task",
+        "details": {
+            "repos": ["pallets/flask"],
+            "base_commits": ["abc123"],
+            "versions": ["1.0"],
+        },
+    }
+    assert manifest["harness"] == {
+        "required_checkers": ["swebench_harness"],
+        "observed": [
+            {
+                "checker": "swebench_harness",
+                "source": "SWE-bench/SWE-bench_Lite",
+                "identity": "fake-harness",
+                "version": "1.2.3",
+                "status": "passed",
+            }
+        ],
+        "identity": "fake-harness",
+        "version": "1.2.3",
+    }
+    assert manifest["provider"] == {
+        "requested_provider": "openrouter",
+        "requested_model": "fake-model",
+        "returned_models": ["openai/gpt-5.4-nano-2026-06-01"],
+        "upstream_providers": ["OpenAI"],
+        "routes": ["primary"],
+    }
 
 
 def test_runner_repeats_trials_with_distinct_run_ids_and_artifacts(tmp_path):

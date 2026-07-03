@@ -67,10 +67,13 @@ Trace JSONL files record configured tools on `llm_call_start` plus raw annotatio
 OpenRouter may route a model ID to different upstream providers. For comparison runs:
 
 - Record both requested model and returned model.
+- Preserve any upstream provider or routing metadata that OpenRouter returns.
 - Keep temperature at `0.0` unless stochasticity is intentional.
 - Use fixed task subsets.
 - Repeat important runs to measure variance.
 - Keep trace JSONL files as audit evidence.
+
+Current manifests record OpenRouter provenance under `provider`, including the requested provider/model plus any observed returned models, upstream providers, or routing hints surfaced in run output.
 
 ## Cost safety
 

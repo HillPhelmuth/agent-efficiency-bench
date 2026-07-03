@@ -1,5 +1,5 @@
-# Default dev subset definition for local benchmark iteration.
-# Keep counts low enough for routine comparison runs.
+# Deterministic dev subset definition for normal local benchmark iteration.
+# This matches the default v0 subset; configs/sources.yaml remains a compatibility alias.
 sources:
   - name: swe_bench_lite
     type: huggingface

@@ -104,6 +104,16 @@ Add `--enable-web-search` for tasks that require OpenRouter's native `openrouter
 
 Add `--n-trials <N>` to repeat each selected task when you want variance-aware comparisons rather than a single sample.
 
+Launch the REST API and charting dashboard:
+
+```bash
+PYTHONPATH= uv run aeb serve --host 127.0.0.1 --port 8000
+# or
+PYTHONPATH= uv run aeb-api
+```
+
+Open `http://127.0.0.1:8000/` to select models, scaffolds, categories, web-search modes, trials, and suite budgets. The same workflow is available as JSON through endpoints such as `GET /api/catalog`, `GET /api/options`, `POST /api/runs`, `GET /api/runs/{job_id}`, and `GET /api/runs/{job_id}/results`.
+
 Generate a report:
 
 ```bash

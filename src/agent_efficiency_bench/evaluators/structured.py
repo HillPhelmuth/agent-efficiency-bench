@@ -16,6 +16,9 @@ class StructuredAnswerEvaluator:
     def evaluate(self, task: Any, result: Any) -> EvaluationScore:
         answer = str(result.output.get("answer") or "")
         citations = _collect_citations(result.output)
+        for url in _urls_in_text(answer):
+            if url not in citations:
+                citations.append(url)
         checks = {
             "text_contains": _check_text_contains(answer, self.expected.get("text_contains") or []),
             "numbers": _check_numbers(answer, self.expected.get("numbers") or []),
@@ -36,10 +39,17 @@ class StructuredAnswerEvaluator:
 
 def _check_text_contains(answer: str, expected_values: list[str]) -> list[dict[str, Any]]:
     normalized = answer.casefold()
-    return [
-        {"expected": value, "passed": str(value).casefold() in normalized}
-        for value in expected_values
-    ]
+    checks = []
+    for value in expected_values:
+        expected_parts = _expected_text_parts(str(value))
+        checks.append(
+            {
+                "expected": value,
+                "expected_parts": expected_parts,
+                "passed": all(part.casefold() in normalized for part in expected_parts),
+            }
+        )
+    return checks
 
 
 def _check_numbers(answer: str, expected_numbers: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -63,7 +73,7 @@ def _check_numbers(answer: str, expected_numbers: list[dict[str, Any]]) -> list[
 
 
 def _check_required_domains(answer: str, citations: list[str], required_domains: list[str]) -> list[dict[str, Any]]:
-    observed = {_domain(value) for value in citations + re.findall(r"https?://\S+", answer)}
+    observed = {_domain(value) for value in citations + _urls_in_text(answer)}
     observed = {domain for domain in observed if domain}
     checks = []
     for required in required_domains:
@@ -81,6 +91,19 @@ def _collect_citations(output: dict[str, Any]) -> list[str]:
         if url and url not in citations:
             citations.append(url)
     return citations
+
+
+def _urls_in_text(text: str) -> list[str]:
+    return [_clean_url(match) for match in re.findall(r"https?://\S+", text)]
+
+
+def _clean_url(value: str) -> str:
+    return value.rstrip(".,;:)]}>'\"*")
+
+
+def _expected_text_parts(value: str) -> list[str]:
+    parts = [part.strip() for part in value.splitlines() if part.strip()]
+    return parts or [value]
 
 
 def _domain(value: str) -> str:

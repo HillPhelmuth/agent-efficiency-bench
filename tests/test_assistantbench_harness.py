@@ -45,7 +45,7 @@ def test_assistantbench_exact_fallback_remains_when_expected_metadata_is_absent(
 def test_assistantbench_web_mode_configures_native_web_search_tool():
     config = model_config_for_assistantbench_mode("openai/gpt-5.4-nano", "openrouter_web_plugin")
     assert config.model == "openai/gpt-5.4-nano"
-    assert config.tools == [{"type": "openrouter:web_search", "parameters": {"engine": "native"}}]
+    assert config.tools == [{"type": "openrouter:web_search", "parameters": {"engine": "auto"}}]
 
 
 def test_assistantbench_evaluator_dispatches_per_task():

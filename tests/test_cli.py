@@ -118,6 +118,13 @@ def test_run_tool_loop_cli_is_registered():
     assert "Run a minimal multi-step OpenRouter tool-loop scaffold" in result.output
 
 
+def test_serve_cli_is_registered():
+    result = CliRunner().invoke(app, ["serve", "--help"])
+
+    assert result.exit_code == 0
+    assert "Start the REST API and benchmark dashboard web UI" in result.output
+
+
 def test_run_answer_cli_passes_suite_budget_options(tmp_path, monkeypatch):
     tasks = tmp_path / "tasks.jsonl"
     tasks.write_text(

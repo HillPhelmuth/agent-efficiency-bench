@@ -389,6 +389,18 @@ def audit_tasks(
         console.print(markdown)
 
 
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Host interface for the REST API/web UI."),
+    port: int = typer.Option(8000, help="Port for the REST API/web UI."),
+    reload: bool = typer.Option(False, help="Enable uvicorn reload for local development."),
+) -> None:
+    """Start the REST API and benchmark dashboard web UI."""
+    import uvicorn
+
+    uvicorn.run("agent_efficiency_bench.api:app", host=host, port=port, reload=reload)
+
+
 def _manifest_lookup(manifest: str | None, runs: list[RunTelemetry]) -> dict[str, dict]:
     if not manifest:
         return {}

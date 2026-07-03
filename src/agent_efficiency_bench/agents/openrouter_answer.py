@@ -96,7 +96,12 @@ class OpenRouterAnswerAgent:
         recorder.emit("task_end", data={"terminated_by": telemetry.terminated_by})
         return RunResult(
             telemetry=telemetry,
-            output={"answer": response.content, "provider_response": _provider_response_metadata(response)},
+            output={
+                "answer": response.content,
+                "annotations": annotations,
+                "citations": citations,
+                "provider_response": _provider_response_metadata(response),
+            },
             trace_path=str(trace_path),
             artifact_dir=str(artifact_path),
         )

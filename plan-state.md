@@ -459,3 +459,136 @@ Added `OpenRouterToolLoopAgent`, a minimal two-step scaffold with scaffold ident
 Added CLI command `run-tool-loop` with the same task/model/category/limit/output/max-token shape as `run-answer`, plus `--enable-web-search` for the research step. Documentation now explains when to use answer-only versus the tool-loop scaffold: answer-only is the cheapest single-call baseline, while tool-loop is for measuring scaffold overhead and research/synthesis quality gains.
 
 Tests use fake provider responses only: one test verifies the two-call research/final flow, token/cost aggregation, scaffold identity, tool passing only on the research call, and exact trace event sequence; another verifies early budget termination after the research step. CLI registration is also tested. Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tool_loop_agent.py -q`, `PYTHONPATH= uv run python -m pytest tests/test_tool_loop_agent.py tests/test_cli.py -q`, and full suite `PYTHONPATH= uv run python -m pytest -q`; the full suite passed with `56 passed`.
+
+---
+
+## [x] Task 11: Convert CLI-first benchmark workflow into REST API with charting web UI
+
+### Acceptance Criteria
+
+- [x] Add a REST API that exposes task catalog metadata, benchmark option discovery, benchmark run creation, run status, run listings, and chart-ready result summaries.
+- [x] Support requesting combinations of models, scaffolds, categories, web-search modes, trials, and suite budgets from one request.
+- [x] Execute requested combinations through the existing benchmark runner without duplicating runner logic.
+- [x] Add a browser UI for selecting combinations, launching runs, polling status, and viewing easy-to-read charts/tables.
+- [x] Keep tests token-free by monkeypatching runner execution and reading fixture telemetry.
+- [x] Document how to launch the REST API/web UI.
+
+### Detailed Technical Instructions
+
+1. Inspect current CLI paths in `src/agent_efficiency_bench/cli.py`, runner behavior in `src/agent_efficiency_bench/runner.py`, and reporting helpers in `src/agent_efficiency_bench/reporting.py`.
+2. Add FastAPI/uvicorn dependencies and expose an app factory in `src/agent_efficiency_bench/api.py`.
+3. Add API schemas for benchmark requests, expanded run combinations, job status, catalog summaries, and chart summary rows.
+4. Implement a small in-memory job registry that runs combinations in a background thread and writes normal `runs/<job-id>/<combination>/` artifacts.
+5. Reuse `OpenRouterAnswerAgent`, `OpenRouterToolLoopAgent`, `BenchmarkRunner`, `RegistryEvaluator`, and existing reporting helpers.
+6. Add static web UI assets under `src/agent_efficiency_bench/web/` served from the API root.
+7. Add tests in `tests/test_api.py` covering catalog/options, dry-run combination expansion, monkeypatched run execution, status/results, and HTML UI serving.
+8. Add `aeb serve` and an `aeb-api` script entry point.
+9. Run targeted API tests, CLI smoke tests, and the full suite.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/api.py`, `src/agent_efficiency_bench/web/index.html`, `src/agent_efficiency_bench/web/app.js`, `src/agent_efficiency_bench/web/styles.css`, `src/agent_efficiency_bench/cli.py`, `pyproject.toml`, `tests/test_api.py`, `tests/test_cli.py`, and `README.md`.
+
+Added a FastAPI application with REST endpoints for `GET /api/options`, `GET /api/catalog`, `POST /api/runs`, `GET /api/runs`, `GET /api/runs/{job_id}`, and `GET /api/runs/{job_id}/results`. `POST /api/runs` expands all requested model/scaffold/category/web-search combinations, supports dry-run previews, and uses a small in-memory job registry for background execution. Real execution reuses `OpenRouterAnswerAgent`, `OpenRouterToolLoopAgent`, `BenchmarkRunner`, `RegistryEvaluator`, `SuiteBudgetConfig`, and existing JSONL/reporting helpers rather than duplicating CLI execution logic.
+
+Added chart-ready summaries through `chart_summary_for_runs()` / `chart_summary_for_telemetry()`, returning both the full grouped reporting summary and compact chart rows for success rate, quality, cost, p50 latency, token totals, and cost per success. Added a static browser dashboard served at `/` with controls for tasks path, output root, models, categories, scaffolds, web-search modes, limits, trials, token cap, dry-run mode, and chart grouping. The UI polls job status and renders Chart.js charts plus a summary table.
+
+Added `aeb serve` and `aeb-api` entry points. `README.md` now documents launching the API/dashboard and the core REST endpoints. Tests cover metadata/catalog endpoints, dry-run combination expansion, monkeypatched token-free execution/status/results, chart summaries from existing telemetry files, root UI serving, and CLI command registration.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_api.py tests/test_cli.py -q` (`20 passed`), `PYTHONPATH= uv run aeb serve --help`, full suite `PYTHONPATH= uv run python -m pytest -q` (`113 passed`), and a live uvicorn smoke test on `127.0.0.1:8765` that returned HTTP 200 for `/`, `/api/options`, `/api/catalog?tasks_path=data/tasks/public_efficiency_subset.jsonl`, and a dry-run `POST /api/runs` expanding to 8 combinations.
+
+---
+
+## [x] Task 12: Fix structured evaluation citation propagation
+
+### Acceptance Criteria
+
+- [x] Provider citations and annotations returned by OpenRouter are available to structured evaluators.
+- [x] Answer-only and tool-loop run outputs expose citation metadata consistently with telemetry counts.
+- [x] A regression test proves a correct AssistantBench answer with a provider citation evaluates successfully.
+- [x] The full test suite passes.
+
+### Detailed Technical Instructions
+
+1. Reproduce a correct AssistantBench structured answer with provider `url_citation` annotations failing citation checks.
+2. Inspect citation extraction in `OpenRouterAnswerAgent`, `OpenRouterToolLoopAgent`, and `StructuredAnswerEvaluator`.
+3. Propagate extracted `annotations` and `citations` into each `RunResult.output`, not just traces and telemetry counters.
+4. Add tests covering output citation fields and structured evaluator visibility.
+5. Run targeted tests and the full suite.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/agents/openrouter_answer.py`, `src/agent_efficiency_bench/agents/openrouter_tool_loop.py`, `tests/test_answer_agent.py`, `tests/test_tool_loop_agent.py`, and `src/agent_efficiency_bench/web/index.html`.
+
+Root cause: OpenRouter response citations were extracted for trace events and telemetry counters but were not copied into `RunResult.output`. `StructuredAnswerEvaluator` reads citations from `result.output`, so AssistantBench tasks with `requires_citation: true` failed citation checks even when the provider returned valid `url_citation` annotations. This could make model results look like universal 0% success for citation-gated web-research benchmarks.
+
+Both answer-only and tool-loop agents now include `annotations` and `citations` in `RunResult.output`. The tool-loop agent accumulates citations from research and final calls while avoiding duplicate citation URLs. Added a regression test that runs an AssistantBench-shaped task through `BenchmarkRunner` with a fake provider response containing the correct answer plus a provider citation and verifies `success=True`, `quality_score=1.0`, and the citation check passing.
+
+Verification completed with the red/green repro command, targeted tests `PYTHONPATH= uv run python -m pytest tests/test_answer_agent.py tests/test_tool_loop_agent.py tests/test_structured_evaluator.py tests/test_assistantbench_harness.py -q` (`18 passed`), and full suite `PYTHONPATH= uv run python -m pytest -q` (`114 passed`, one FastAPI/httpx deprecation warning).
+
+---
+
+## [x] Task 13: Handle non-JSON OpenRouter API responses clearly
+
+### Acceptance Criteria
+
+- [x] OpenRouter client no longer surfaces raw `requests.exceptions.JSONDecodeError` when the API returns non-JSON content.
+- [x] Error messages include enough response context to diagnose upstream HTML/text responses without dumping huge bodies.
+- [x] OpenRouter requests explicitly ask for JSON responses.
+- [x] Regression tests cover non-JSON chat-completion responses.
+- [x] The full test suite passes.
+
+### Detailed Technical Instructions
+
+1. Inspect `src/agent_efficiency_bench/providers/openrouter.py` at the `response.json()` call from the API traceback.
+2. Add a small JSON parsing helper that catches decode failures after `raise_for_status()`.
+3. Send an `Accept: application/json` request header.
+4. Include status code, content type, and a truncated normalized body preview in the raised error.
+5. Reuse the helper for both chat completions and generation stats.
+6. Add a fake-session regression test for a 200 `text/html` response.
+7. Run targeted and full tests.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/providers/openrouter.py` and `tests/test_openrouter_client.py`.
+
+Root cause: OpenRouter returned an HTTP-success response body that was not JSON, so `requests.Response.json()` raised a raw `JSONDecodeError`. In API background jobs this became a long traceback pointing at JSON internals rather than the upstream response shape.
+
+Added `Accept: application/json` to OpenRouter requests, plus `OpenRouterResponseError` and `_json_payload(response, context=...)`. The helper catches non-JSON responses and raises a concise diagnostic such as `OpenRouter chat completion returned non-JSON response (status=200, content_type='text/html', body_preview='...')`. It also guards against top-level JSON arrays/strings where an object is required. Both `chat()` and `generation_stats()` now use this helper.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_openrouter_client.py -q` (`3 passed`), `PYTHONPATH= uv run python -m pytest tests/test_api.py tests/test_openrouter_client.py -q` (`8 passed`), and full suite `PYTHONPATH= uv run python -m pytest -q` (`115 passed`, one FastAPI/httpx deprecation warning).
+
+---
+
+## [x] Task 14: Fix web-research evaluation false negatives in API results
+
+### Acceptance Criteria
+
+- [x] Review actual `runs/api` artifacts to identify why web-research tasks report 100% failure.
+- [x] Structured citation checks accept explicit source URLs in the answer text, not only provider-native citation arrays.
+- [x] Multiline expected answers are evaluated as required answer parts rather than one brittle exact newline substring.
+- [x] API chart summaries can re-evaluate existing `run_results.jsonl` artifacts with the current evaluator instead of trusting stale telemetry-only success flags.
+- [x] Regression tests cover the evaluator and API summary behavior.
+- [x] The full test suite passes.
+
+### Detailed Technical Instructions
+
+1. Parse all `runs/api/**/run_results.jsonl` files and compare answer text, expected metadata, citations, and evaluation details.
+2. Confirm whether any failed web-research rows contain the expected answer plus source URLs.
+3. Update `StructuredAnswerEvaluator` so `requires_citation` can be satisfied by URLs embedded in the answer text after URL cleanup.
+4. Update text containment checks for newline-delimited expected answers such as `CrossFit East River\nAvea Pilates`.
+5. Update API summary generation so existing run artifact summaries use `run_results.jsonl` when available and re-run the current evaluator.
+6. Add regression tests for answer-URL citations, multiline expected answers, and API re-evaluation of stale run telemetry.
+7. Run targeted and full tests.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/evaluators/structured.py`, `src/agent_efficiency_bench/api.py`, `tests/test_structured_evaluator.py`, and `tests/test_api.py`.
+
+Actual `runs/api` review found 23 web-research result rows, all marked failed. Six rows for `assistantbench__291b53e665b4dd4365cde995042db4a6f6fecef3fe3a6f4482f23d61bd673918` contained the exact expected Ensembl GFF3 URL in the answer but had `requires_citation` failing because the evaluator only looked at `output.citations` / `output.annotations`, not URLs embedded in the model's answer. Several other rows had correct source links but wrong final answers, so they now receive partial citation credit rather than a total false-negative citation failure.
+
+`StructuredAnswerEvaluator` now extracts and cleans `http(s)` URLs from answer text and treats them as citations for both `requires_citation` and required-domain checks. It also splits newline-delimited expected text into required parts, avoiding false negatives when a model returns expected multi-answer items in a different order or with bullets instead of the original newline formatting.
+
+`chart_summary_for_runs()` now prefers sibling `run_results.jsonl` files when available, re-evaluates each `RunResult` against the current task metadata, and summarizes the updated telemetry. This lets the API/dashboard reflect evaluator fixes for existing `runs/api` artifacts instead of staying pinned to stale success flags in `run_telemetry.jsonl`. Re-evaluating the current `runs/api` web-research artifacts now shows non-zero success: `minimax/minimax-m3-20260531` at `3/12` successes (`25%`) and `openai/gpt-5.4-nano-20260317` at `3/11` successes (`27.27%`).
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_structured_evaluator.py tests/test_api.py -q` (`12 passed`), direct re-evaluation of `runs/api` artifacts via `chart_summary_for_runs()`, and full suite `PYTHONPATH= uv run python -m pytest -q` (`118 passed`, one FastAPI/httpx deprecation warning).

@@ -67,3 +67,25 @@ def test_structured_evaluator_fails_missing_citation():
 
     assert score.success is False
     assert score.details["checks"]["requires_citation"]["passed"] is False
+
+
+def test_structured_evaluator_treats_urls_in_answer_as_citations():
+    evaluator = StructuredAnswerEvaluator(
+        {
+            "text_contains": ["https://example.com/data.gff3.gz"],
+            "requires_citation": True,
+        }
+    )
+
+    score = evaluator.evaluate(None, make_result("The file is https://example.com/data.gff3.gz."))
+
+    assert score.success is True
+    assert score.details["checks"]["requires_citation"]["citations"] == ["https://example.com/data.gff3.gz"]
+
+
+def test_structured_evaluator_splits_multiline_expected_text_into_required_parts():
+    evaluator = StructuredAnswerEvaluator({"text_contains": ["CrossFit East River\nAvea Pilates"]})
+
+    score = evaluator.evaluate(None, make_result("The qualifying gyms are Avea Pilates and CrossFit East River."))
+
+    assert score.success is True

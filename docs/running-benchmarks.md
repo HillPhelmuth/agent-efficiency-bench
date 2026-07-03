@@ -73,7 +73,7 @@ PYTHONPATH= uv run aeb run-answer \
 If the task requires live web search, add `--enable-web-search`. This passes OpenRouter's native server tool configuration:
 
 ```json
-{"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+{"type": "openrouter:web_search", "parameters": {"engine": "auto"}}
 ```
 
 When provider-side search is enabled, telemetry records `server_tools_configured`, `num_annotations`, and `num_citations` separately from local `num_tool_calls`.

@@ -29,7 +29,7 @@ OpenRouter's deprecated `plugins=[{"id":"web"}]` and `:online` model suffix path
 ```json
 {
   "tools": [
-    {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+    {"type": "openrouter:web_search", "parameters": {"engine": "auto"}}
   ]
 }
 ```

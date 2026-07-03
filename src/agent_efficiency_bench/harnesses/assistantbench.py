@@ -5,7 +5,7 @@ from agent_efficiency_bench.evaluators.simple import ExactAnswerEvaluator, Uneva
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig
 
 
-def native_web_search_tool(engine: str = "native") -> dict:
+def native_web_search_tool(engine: str = "auto") -> dict:
     return {
         "type": "openrouter:web_search",
         "parameters": {"engine": engine},

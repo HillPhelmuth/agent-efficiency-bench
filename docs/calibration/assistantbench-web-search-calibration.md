@@ -44,7 +44,7 @@ The two manifests have matching task IDs, agent, requested model, returned model
 ### Web-search trace
 
 - `llm_call_start` includes `tools_configured: ["openrouter:web_search"]`.
-- The full tool payload is present: `{"type": "openrouter:web_search", "parameters": {"engine": "native"}}`.
+- The full tool payload is present: `{"type": "openrouter:web_search", "parameters": {"engine": "auto"}}`.
 - `llm_call_end` includes two `url_citation` annotations and two extracted citation URLs:
   - `https://www.doordash.com/business/trader-joes-3947/menu`
   - `https://www.jewelosco.com/home/pre-made-salad.html`

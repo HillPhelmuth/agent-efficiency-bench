@@ -1,16 +1,33 @@
-from agent_efficiency_bench.providers.openrouter import OpenRouterClient
+import pytest
+
+from agent_efficiency_bench.providers.openrouter import OpenRouterClient, OpenRouterResponseError
 from agent_efficiency_bench.schemas import ModelConfig
 
 
 class FakeResponse:
     def __init__(self, payload):
         self.payload = payload
+        self.status_code = 200
+        self.headers = {"content-type": "application/json"}
+        self.text = ""
 
     def raise_for_status(self):
         pass
 
     def json(self):
         return self.payload
+
+
+class NonJsonResponse:
+    status_code = 200
+    headers = {"content-type": "text/html"}
+    text = "<html>OpenRouter upstream temporarily unavailable</html>"
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        raise ValueError("Expecting value")
 
 
 class FakeSession:
@@ -39,6 +56,11 @@ class FakeSession:
         )
 
 
+class NonJsonSession:
+    def post(self, url, headers, json, timeout):
+        return NonJsonResponse()
+
+
 def test_openrouter_client_extracts_usage_and_cost():
     session = FakeSession()
     client = OpenRouterClient(api_key="test", session=session)
@@ -54,6 +76,7 @@ def test_openrouter_client_extracts_usage_and_cost():
     assert result.total_tokens == 14
     assert result.cost_usd == 0.00001
     assert session.calls[0][2]["Authorization"] == "Bearer test"
+    assert session.calls[0][2]["Accept"] == "application/json"
     assert session.calls[0][3]["model"] == "openai/gpt-5.4-nano"
 
 
@@ -70,3 +93,19 @@ def test_openrouter_client_forwards_configured_tools_and_tool_choice():
     body = session.calls[0][3]
     assert body["tools"] == [tool]
     assert body["tool_choice"] == "auto"
+
+
+def test_openrouter_client_reports_non_json_response_with_preview():
+    client = OpenRouterClient(api_key="test", session=NonJsonSession())
+
+    with pytest.raises(OpenRouterResponseError) as exc_info:
+        client.chat(
+            config=ModelConfig(model="openai/gpt-5.4-nano"),
+            messages=[{"role": "user", "content": "hi"}],
+        )
+
+    message = str(exc_info.value)
+    assert "OpenRouter chat completion returned non-JSON response" in message
+    assert "status=200" in message
+    assert "text/html" in message
+    assert "OpenRouter upstream temporarily unavailable" in message

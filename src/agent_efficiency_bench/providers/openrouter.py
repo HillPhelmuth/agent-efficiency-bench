@@ -21,6 +21,12 @@ class OpenRouterResponse(BaseModel):
     raw: dict[str, Any]
 
 
+class OpenRouterResponseError(RuntimeError):
+    """Raised when OpenRouter returns an unusable HTTP response."""
+
+    pass
+
+
 class OpenRouterClient:
     def __init__(
         self,
@@ -39,6 +45,7 @@ class OpenRouterClient:
     def _headers(self) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
             "Content-Type": "application/json",
             "X-OpenRouter-Title": os.getenv("OPENROUTER_APP_TITLE", "Agent Efficiency Bench"),
         }
@@ -77,7 +84,7 @@ class OpenRouterClient:
             timeout=self.timeout,
         )
         response.raise_for_status()
-        payload = response.json()
+        payload = _json_payload(response, context="OpenRouter chat completion")
         usage = payload.get("usage") or {}
         choices = payload.get("choices") or []
         first_choice = choices[0] if choices else {}
@@ -108,7 +115,7 @@ class OpenRouterClient:
             timeout=self.timeout,
         )
         response.raise_for_status()
-        return response.json()
+        return _json_payload(response, context="OpenRouter generation stats")
 
 
 def _extract_generation_cost(payload: dict[str, Any]) -> float | None:
@@ -117,3 +124,37 @@ def _extract_generation_cost(payload: dict[str, Any]) -> float | None:
         if key in data and data[key] is not None:
             return float(data[key])
     return None
+
+
+def _json_payload(response: Any, *, context: str) -> dict[str, Any]:
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise OpenRouterResponseError(
+            f"{context} returned non-JSON response "
+            f"(status={getattr(response, 'status_code', 'unknown')}, "
+            f"content_type={_response_content_type(response)!r}, "
+            f"body_preview={_response_text_preview(response)!r})"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise OpenRouterResponseError(
+            f"{context} returned JSON {type(payload).__name__}, expected object "
+            f"(status={getattr(response, 'status_code', 'unknown')})"
+        )
+    return payload
+
+
+def _response_content_type(response: Any) -> str | None:
+    headers = getattr(response, "headers", {}) or {}
+    try:
+        return headers.get("content-type") or headers.get("Content-Type")
+    except AttributeError:
+        return None
+
+
+def _response_text_preview(response: Any, limit: int = 500) -> str:
+    text = getattr(response, "text", "") or ""
+    normalized = " ".join(str(text).split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[:limit]}…"

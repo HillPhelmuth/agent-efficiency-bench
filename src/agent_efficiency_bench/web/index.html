@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Agent Efficiency Bench</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="2" width="24" height="24" rx="7" stroke="currentColor" stroke-width="2"/>
+            <path d="M9 18l3-8 4 6 3-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">Benchmark Dashboard</p>
+          <h1>Agent Efficiency Bench</h1>
+        </div>
+      </div>
+      <nav class="header-actions" aria-label="Toolbar">
+        <button id="theme-toggle" class="btn btn-ghost" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button id="refresh-options" class="btn btn-secondary" type="button">Refresh metadata</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="layout">
+    <!-- Run configuration -->
+    <section class="card card-form" aria-labelledby="form-heading">
+      <div class="card-header">
+        <h2 id="form-heading">Configure run</h2>
+        <span class="badge badge-info" id="combination-count" hidden>0 combinations</span>
+      </div>
+      <form id="run-form" class="form-grid" novalidate>
+        <div class="field span-2">
+          <label for="f-tasks_path">Tasks JSONL path</label>
+          <input id="f-tasks_path" name="tasks_path" value="data/tasks/public_efficiency_subset.jsonl" required />
+        </div>
+        <div class="field span-2">
+          <label for="f-output_root">Output root</label>
+          <input id="f-output_root" name="output_root" value="runs/api" />
+        </div>
+        <div class="field span-2">
+          <label for="f-models">Models <span class="hint">(comma separated)</span></label>
+          <input id="f-models" name="models" value="openai/gpt-5.4-nano" required />
+        </div>
+        <div class="field">
+          <label for="f-categories">Categories <span class="hint">(comma separated, blank = all)</span></label>
+          <input id="f-categories" name="categories" value="web_research" />
+        </div>
+        <div class="field">
+          <label for="f-limit">Limit per combination</label>
+          <input id="f-limit" name="limit" type="number" min="1" value="1" />
+        </div>
+        <div class="field">
+          <label for="f-n_trials">Trials</label>
+          <input id="f-n_trials" name="n_trials" type="number" min="1" value="1" />
+        </div>
+        <div class="field">
+          <label for="f-max_completion_tokens">Max completion tokens</label>
+          <input id="f-max_completion_tokens" name="max_completion_tokens" type="number" min="1" value="256" />
+        </div>
+        <fieldset class="field">
+          <legend>Scaffolds</legend>
+          <div class="checkbox-group">
+            <label class="chip"><input type="checkbox" name="scaffolds" value="answer-only" checked /> answer-only</label>
+            <label class="chip"><input type="checkbox" name="scaffolds" value="react-tool-loop" /> react-tool-loop</label>
+          </div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Web search</legend>
+          <div class="checkbox-group">
+            <label class="chip"><input type="checkbox" name="web_search" value="false" checked /> disabled</label>
+            <label class="chip"><input type="checkbox" name="web_search" value="true" /> enabled</label>
+          </div>
+        </fieldset>
+        <div class="field span-2">
+          <label for="f-group_by">Group charts by <span class="hint">(comma separated)</span></label>
+          <input id="f-group_by" name="group_by" value="category,model,scaffold" />
+        </div>
+        <div class="field-row span-2">
+          <label class="chip"><input type="checkbox" name="dry_run" /> Dry run only</label>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Start run</button>
+        </div>
+      </form>
+      <details class="payload-preview" hidden id="payload-wrap">
+        <summary>Request payload</summary>
+        <pre id="request-preview"></pre>
+      </details>
+    </section>
+
+    <!-- Sidebar: catalog + options -->
+    <aside class="sidebar" aria-label="Catalog and options">
+      <section class="card">
+        <div class="card-header">
+          <h2>Task catalog</h2>
+          <span class="badge" id="catalog-total" hidden>0 tasks</span>
+        </div>
+        <div id="catalog" class="catalog-body">
+          <p class="empty-state">Loading catalog…</p>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header">
+          <h2>API options</h2>
+        </div>
+        <div id="options-body" class="options-body">
+          <p class="empty-state">Loading…</p>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Run status -->
+    <section class="card card-wide" aria-labelledby="status-heading">
+      <div class="card-header">
+        <h2 id="status-heading">Run status</h2>
+        <span id="status-badge" class="badge badge-muted" hidden>—</span>
+      </div>
+      <div id="status" class="status-body">
+        <p class="empty-state">No run started yet. Configure a run and press <strong>Start run</strong>.</p>
+      </div>
+    </section>
+
+    <!-- Results: metric cards + Charts + table -->
+    <section class="card card-wide" aria-labelledby="results-heading" id="results-section" hidden>
+      <div class="card-header">
+        <h2 id="results-heading">Results</h2>
+      </div>
+      <div class="metric-cards" id="metric-cards"></div>
+      <div class="charts">
+        <div class="chart-card"><h3>Success rate</h3><canvas id="success-chart"></canvas></div>
+        <div class="chart-card"><h3>Total cost (USD)</h3><canvas id="cost-chart"></canvas></div>
+        <div class="chart-card"><h3>p50 latency (seconds)</h3><canvas id="latency-chart"></canvas></div>
+        <div class="chart-card"><h3>Total tokens</h3><canvas id="tokens-chart"></canvas></div>
+      </div>
+      <div class="table-wrap">
+        <h3>Summary table</h3>
+        <div id="summary-table" class="table-scroll"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast-container" class="toast-container" role="alert" aria-live="polite"></div>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

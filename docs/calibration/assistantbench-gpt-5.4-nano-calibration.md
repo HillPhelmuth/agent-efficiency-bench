@@ -69,7 +69,7 @@ Closed-book trace observations:
 Web-search trace observations:
 
 - `llm_call_start` recorded `tools_configured: ["openrouter:web_search"]`.
-- The OpenRouter native web-search tool payload was recorded as `{"type": "openrouter:web_search", "parameters": {"engine": "native"}}`.
+- The OpenRouter native web-search tool payload was recorded as `{"type": "openrouter:web_search", "parameters": {"engine": "auto"}}`.
 - `llm_call_end` contained two `url_citation` annotations.
 - Extracted citation URLs:
   - `https://www.doordash.com/business/trader-joes-3947/menu`

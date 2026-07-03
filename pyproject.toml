@@ -6,19 +6,22 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "datasets>=2.19.0",
+  "fastapi>=0.115.0",
   "huggingface-hub>=0.23.0",
   "pydantic>=2.7.0",
   "pyyaml>=6.0.1",
   "requests>=2.32.0",
   "rich>=13.7.0",
   "typer>=0.12.0",
+  "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.2.0"]
+dev = ["httpx>=0.27.0", "pytest>=8.2.0"]
 
 [project.scripts]
 aeb = "agent_efficiency_bench.cli:app"
+aeb-api = "agent_efficiency_bench.api:main"
 
 [build-system]
 requires = ["hatchling"]

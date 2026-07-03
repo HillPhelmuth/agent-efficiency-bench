@@ -1,4 +1,6 @@
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
+from agent_efficiency_bench.evaluators.registry import RegistryEvaluator
+from agent_efficiency_bench.runner import BenchmarkRunner
 from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, ModelConfig, SuccessCriteria
 
 
@@ -50,6 +52,8 @@ def test_answer_agent_returns_output_and_usage(tmp_path):
     result = agent.run(make_task(), artifact_dir=tmp_path)
 
     assert result.output["answer"] == "final answer"
+    assert result.output["annotations"] == [{"type": "url_citation", "url_citation": {"url": "https://example.com"}}]
+    assert result.output["citations"] == ["https://example.com"]
     assert result.telemetry.input_tokens == 20
     assert result.telemetry.output_tokens == 5
     assert result.telemetry.estimated_usd == 0.01
@@ -77,7 +81,7 @@ def test_answer_agent_passes_configured_tools_to_openrouter(tmp_path):
 
 
 def test_answer_agent_uses_web_search_scaffold_when_openrouter_web_search_configured(tmp_path):
-    tool = {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+    tool = {"type": "openrouter:web_search", "parameters": {"engine": "auto"}}
     agent = OpenRouterAnswerAgent(client=FakeClient(), config=ModelConfig(model="openai/gpt-5.4-nano", tools=[tool]))
 
     result = agent.run(make_task(requires_external_search=True), artifact_dir=tmp_path)
@@ -87,7 +91,7 @@ def test_answer_agent_uses_web_search_scaffold_when_openrouter_web_search_config
 
 
 def test_answer_agent_traces_configured_tools_and_response_annotations(tmp_path):
-    tool = {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+    tool = {"type": "openrouter:web_search", "parameters": {"engine": "auto"}}
     agent = OpenRouterAnswerAgent(client=FakeClient(), config=ModelConfig(model="openai/gpt-5.4-nano", tools=[tool]))
 
     result = agent.run(make_task(requires_external_search=True), artifact_dir=tmp_path)
@@ -130,3 +134,34 @@ def test_answer_agent_marks_budget_exceeded_and_traces_event(tmp_path):
     exceeded = next(row for row in trace_rows if row["event"] == "budget_exceeded")
     assert result.telemetry.terminated_by == "budget_tokens"
     assert exceeded["data"]["termination_reason"] == "budget_tokens"
+
+
+def test_answer_agent_provider_citations_are_visible_to_structured_evaluator(tmp_path):
+    class CorrectAnswerResponse(FakeResponse):
+        content = "Potash Markets - Clark Street"
+
+    class CorrectAnswerClient(FakeClient):
+        def chat(self, config, messages, tools=None, tool_choice=None):
+            self.calls.append({"config": config, "messages": messages, "tools": tools, "tool_choice": tool_choice})
+            return CorrectAnswerResponse()
+
+    task = BenchmarkTask(
+        task_id="assistantbench__citation_regression",
+        source="AssistantBench/AssistantBench",
+        source_type="huggingface",
+        category="web_research",
+        instruction="Which store has the salad?",
+        environment={"type": "web"},
+        complexity=Complexity(horizon="short", requires_external_search=True),
+        budgets=Budget(),
+        success_criteria=SuccessCriteria(type="structured_answer", checker="assistantbench_exact_or_rubric"),
+        raw={"expected": {"text_contains": ["Potash Markets - Clark Street"], "requires_citation": True}},
+    )
+    agent = OpenRouterAnswerAgent(client=CorrectAnswerClient(), config=ModelConfig(model="fake/model"))
+    runner = BenchmarkRunner(agent=agent, evaluator=RegistryEvaluator(), output_dir=tmp_path)
+
+    result = runner.run_task(task)
+
+    assert result.telemetry.success is True
+    assert result.telemetry.quality_score == 1.0
+    assert result.output["evaluation"]["details"]["checks"]["requires_citation"]["passed"] is True

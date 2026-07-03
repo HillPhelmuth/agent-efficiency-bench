@@ -42,7 +42,7 @@ def make_task(budget=None):
 
 
 def test_tool_loop_agent_runs_research_and_final_llm_calls(tmp_path):
-    tool = {"type": "openrouter:web_search", "parameters": {"engine": "native"}}
+    tool = {"type": "openrouter:web_search", "parameters": {"engine": "auto"}}
     client = FakeClient([
         FakeResponse("research notes", prompt_tokens=11, completion_tokens=7, cost_usd=0.02, generation_id="research"),
         FakeResponse("final answer", prompt_tokens=13, completion_tokens=3, cost_usd=0.01, generation_id="final"),
@@ -63,6 +63,11 @@ def test_tool_loop_agent_runs_research_and_final_llm_calls(tmp_path):
 
     assert result.output["answer"] == "final answer"
     assert result.output["research"] == "research notes"
+    assert result.output["citations"] == ["https://example.com/research", "https://example.com/final"]
+    assert result.output["annotations"] == [
+        {"type": "url_citation", "url_citation": {"url": "https://example.com/research"}},
+        {"type": "url_citation", "url_citation": {"url": "https://example.com/final"}},
+    ]
     assert result.telemetry.scaffold == "react-tool-loop"
     assert result.telemetry.num_llm_calls == 2
     assert result.telemetry.input_tokens == 24

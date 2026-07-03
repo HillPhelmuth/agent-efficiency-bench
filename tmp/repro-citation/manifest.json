@@ -1,0 +1,64 @@
+{
+  "run_suite_id": "suite-377b5b64c5b8",
+  "agent": "openrouter-answer",
+  "model": "fake/model",
+  "output_dir": "tmp\\repro-citation",
+  "created_at": "2026-07-03T08:14:38.729293Z",
+  "task_ids": [
+    "assistantbench__8ad84bd6fe38481ba49e7ad1f6fbd43219a999074e5c6fc940003281f55ec65b"
+  ],
+  "trial_count": 1,
+  "trial_indices": [],
+  "scaffold": "answer-only",
+  "tools_configured": [],
+  "budget": {
+    "max_wall_clock_seconds": 1200,
+    "max_total_tokens": 250000,
+    "max_estimated_usd": 3.0,
+    "max_tool_calls": 60,
+    "max_llm_calls": 30
+  },
+  "suite_budget": {
+    "limits": {},
+    "observed": {
+      "tasks_completed": 1,
+      "failures": 0,
+      "estimated_usd": 0.0,
+      "wall_clock_seconds": 0.008795699992333539
+    },
+    "terminated_by": null,
+    "aborted": false
+  },
+  "source_revisions": {
+    "AssistantBench/AssistantBench": {
+      "source_type": "huggingface",
+      "source_url": "https://huggingface.co/datasets/AssistantBench/AssistantBench",
+      "revision": "dev",
+      "details": {
+        "split": "dev"
+      }
+    }
+  },
+  "evaluator": {
+    "name": "RegistryEvaluator",
+    "package_version": "0.1.0"
+  },
+  "harness": {},
+  "provider": {
+    "requested_provider": "openrouter",
+    "requested_model": "fake/model",
+    "returned_models": [
+      "fake/model"
+    ],
+    "upstream_providers": [],
+    "routes": []
+  },
+  "git_commit": "9a7ed2969f4dd4ed63794c664e4125337a1d952f",
+  "environment": {
+    "python_version": "3.13.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cwd": "C:\\Users\\adamh\\source\\repos\\agent-efficiency-bench",
+    "git_commit": "9a7ed2969f4dd4ed63794c664e4125337a1d952f",
+    "command": "-"
+  }
+}

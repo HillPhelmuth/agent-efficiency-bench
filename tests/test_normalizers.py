@@ -1,4 +1,6 @@
+from agent_efficiency_bench import sources
 from agent_efficiency_bench.sources import (
+    load_terminal_bench_github_subset,
     normalize_assistantbench,
     normalize_swe_bench,
     normalize_tau2_bench,
@@ -24,13 +26,31 @@ def test_normalize_swe_bench_row():
 
 
 def test_normalize_assistantbench_row():
-    row = {"id": "dev-1", "question": "Find the cheapest option", "answer": "A"}
+    row = {
+        "id": "dev-1",
+        "question": "Find the cheapest option",
+        "answer": "A",
+        "urls": ["https://www.example.com/article", "https://sub.example.org/path"],
+    }
 
     task = normalize_assistantbench(row, split="dev")
 
     assert task.task_id == "assistantbench__dev-1"
     assert task.category == "web_research"
     assert task.environment["type"] == "web"
+    assert task.raw["expected"] == {
+        "text_contains": ["A"],
+        "required_domains": ["example.com", "sub.example.org"],
+        "requires_citation": True,
+    }
+
+
+def test_normalize_assistantbench_row_omits_expected_when_no_answer_or_urls():
+    row = {"id": "dev-2", "question": "Find the cheapest option"}
+
+    task = normalize_assistantbench(row, split="dev")
+
+    assert "expected" not in task.raw
 
 
 def test_normalize_terminal_bench_task_yaml():
@@ -77,3 +97,32 @@ def test_normalize_tau2_bench_row():
     assert task.complexity.expected_tool_calls_typical == 2
     assert task.success_criteria.checker == "tau2_harness"
     assert "exchange a delivered order" in task.instruction
+
+
+def test_load_terminal_bench_github_subset_excludes_template_paths_before_sampling(monkeypatch):
+    tree = [
+        {"type": "blob", "path": "tasks/template/task.yaml"},
+        {"type": "blob", "path": "tasks/alpha/task.yaml"},
+        {"type": "blob", "path": "tasks/beta/task.yaml"},
+    ]
+
+    class FakeResponse:
+        def __init__(self, text: str):
+            self.text = text
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url: str, timeout: int):
+        task_id = url.rstrip("/").split("/")[-2]
+        return FakeResponse(f"instruction: Complete {task_id}.\ndifficulty: easy\n")
+
+    monkeypatch.setattr(sources, "_github_tree", lambda repo, branch: tree)
+    monkeypatch.setattr(sources.requests, "get", fake_get)
+
+    tasks = load_terminal_bench_github_subset(
+        {"repo": "harbor-framework/terminal-bench", "branch": "main", "sample_size": 2}
+    )
+
+    assert len(tasks) == 2
+    assert {task.task_id for task in tasks} == {"terminal_bench__alpha", "terminal_bench__beta"}

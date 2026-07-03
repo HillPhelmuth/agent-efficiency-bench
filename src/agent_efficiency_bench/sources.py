@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 import yaml
@@ -75,6 +76,10 @@ def normalize_swe_bench(row: dict[str, Any]) -> BenchmarkTask:
 def normalize_assistantbench(row: dict[str, Any], split: str = "dev") -> BenchmarkTask:
     task_id = str(row.get("id") or row.get("task_id") or hashlib.sha1(json.dumps(row, sort_keys=True).encode()).hexdigest()[:12])
     question = str(row.get("question") or row.get("instruction") or row.get("query") or row.get("task") or "")
+    raw = {k: row.get(k) for k in ("id", "answer", "answer_type", "urls", "explanation") if k in row}
+    expected = _assistantbench_expected(row)
+    if expected:
+        raw["expected"] = expected
     return BenchmarkTask(
         task_id=f"assistantbench__{task_id}",
         source="AssistantBench/AssistantBench",
@@ -96,8 +101,41 @@ def normalize_assistantbench(row: dict[str, Any], split: str = "dev") -> Benchma
         budgets=Budget(max_wall_clock_seconds=1200, max_total_tokens=250_000, max_estimated_usd=3.0, max_tool_calls=60, max_llm_calls=30),
         success_criteria=SuccessCriteria(type="structured_answer", checker="assistantbench_exact_or_rubric"),
         tags=["web", "research", "qa", "public", split],
-        raw={k: row.get(k) for k in ("id", "answer", "answer_type", "urls", "explanation") if k in row},
+        raw=raw,
     )
+
+
+def _assistantbench_expected(row: dict[str, Any]) -> dict[str, Any]:
+    expected: dict[str, Any] = {}
+    answer = str(row.get("answer") or "").strip()
+    if answer:
+        expected["text_contains"] = [answer]
+
+    required_domains = _assistantbench_domains(row.get("urls"))
+    if required_domains:
+        expected["required_domains"] = required_domains
+
+    if answer or required_domains:
+        expected["requires_citation"] = True
+
+    return expected
+
+
+def _assistantbench_domains(urls: Any) -> list[str]:
+    values: list[str] = []
+    if isinstance(urls, str):
+        values = [urls]
+    elif isinstance(urls, list):
+        values = [str(url) for url in urls if str(url).strip()]
+
+    domains: list[str] = []
+    for value in values:
+        parsed = urlparse(value)
+        domain = (parsed.netloc or parsed.path or "").casefold().strip().removeprefix("www.")
+        domain = domain.split("/")[0]
+        if domain and domain not in domains:
+            domains.append(domain)
+    return domains
 
 
 def _loose_yaml_field(yaml_text: str, field: str) -> str | None:
@@ -115,6 +153,15 @@ def _loose_yaml_field(yaml_text: str, field: str) -> str | None:
                 return "\n".join(block).strip()
             return value.strip('"\'')
     return None
+
+
+def _is_terminal_bench_candidate_path(path: str) -> bool:
+    normalized = path.strip("/").lower()
+    parts = [part for part in normalized.split("/") if part]
+    excluded_parts = {"template", "templates", "example", "examples"}
+    if any(part in excluded_parts for part in parts):
+        return False
+    return normalized.endswith(("task.yaml", "task.yml"))
 
 
 def normalize_terminal_bench_task(task_id: str, yaml_text: str, source_url: str | None = None) -> BenchmarkTask:
@@ -242,6 +289,7 @@ def load_terminal_bench_github_subset(spec: dict[str, Any]) -> list[BenchmarkTas
     yaml_paths = [item["path"] for item in tree if item.get("type") == "blob" and item.get("path", "").endswith("task.yaml")]
     if not yaml_paths:
         yaml_paths = [item["path"] for item in tree if item.get("type") == "blob" and item.get("path", "").endswith("task.yml")]
+    yaml_paths = [path for path in yaml_paths if _is_terminal_bench_candidate_path(path)]
     sample_size = int(spec.get("sample_size", 10))
     sampled_paths = _stable_sample(yaml_paths, sample_size, lambda path: path)
     tasks = []

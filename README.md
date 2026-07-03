@@ -11,6 +11,45 @@ This repository starts with small public subsets from Hugging Face and GitHub be
 - Track run telemetry separately from outcome scoring.
 - Report cost/time/token efficiency only in the context of task success or quality.
 
+## v0 Scope
+
+v0 is the point where this repository becomes a credible local benchmark harness for a small default subset, not just a source-normalization scaffold.
+
+Included in v0:
+
+- A deterministic dev subset built from the public sources in `configs/sources.yaml` and written to `data/tasks/public_efficiency_subset.jsonl`.
+- A source adapter for every default source included in that dev subset.
+- End-to-end scoring for every source included in the default dev subset, either through a local evaluator or an official harness result parser.
+- Reports and manifests that distinguish evaluated runs from unevaluated runs and preserve benchmark provenance.
+
+Excluded from v0:
+
+- Full upstream benchmark execution as the default local workflow.
+- Claims of benchmark success for runs that do not have a real evaluator or official harness result.
+- Large-scale paid benchmark sweeps by default.
+
+Benchmark tiers:
+
+- `smoke`: 1 task per selected source for fast local validation, fake-provider checks, and CLI sanity tests.
+- `dev`: the deterministic public subset under `configs/sources.yaml` and `data/tasks/public_efficiency_subset.jsonl`; this is the default v0 benchmark slice.
+- `release`: a larger pinned subset intended for model and scaffold comparisons once the local workflow is stable.
+- `external/full`: official benchmark suites that require upstream harness setup and may run Docker, external environments, or paid model calls.
+
+Run/evaluation terms used throughout the docs:
+
+- `evaluated`: the run was scored by a real evaluator or by parsed official harness output.
+- `unevaluated`: the run produced telemetry or artifacts, but there is no scoring path that can justify benchmark success claims.
+- `successful`: the evaluated run met its success criteria.
+- `failed`: the run completed or terminated without meeting success criteria.
+- `budget-exceeded`: the run stopped because a task or suite budget limit was hit; any resources already spent still count in telemetry.
+
+Current local scoring status:
+
+- `web_research` / AssistantBench tasks are evaluated through structured-answer or exact-answer logic when expected metadata is present.
+- `software_engineering` / SWE-bench Lite tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached.
+- `terminal_work` / Terminal-Bench tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached.
+- `tool_workflow` / tau2-bench tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached. A tau2 official adapter now supports task-id mapping and dry-run planning, but execute still requires an explicit external runner module because the upstream command shape is not pinned in this repository.
+
 ## Quick start
 
 ```bash
@@ -59,6 +98,8 @@ PYTHONPATH= uv run aeb run-tool-loop \
 ```
 
 Add `--enable-web-search` for tasks that require OpenRouter's native `openrouter:web_search` server tool.
+
+Add `--n-trials <N>` to repeat each selected task when you want variance-aware comparisons rather than a single sample.
 
 Generate a report:
 

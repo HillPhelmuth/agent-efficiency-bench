@@ -36,6 +36,13 @@ OpenRouter's deprecated `plugins=[{"id":"web"}]` and `:online` model suffix path
 
 `OpenRouterClient.chat(...)` forwards `tools` and optional `tool_choice` into the Chat Completions request. `run-assistantbench --mode openrouter_web_plugin` keeps the historical mode name for compatibility, but now configures `openrouter:web_search` instead of the deprecated plugin API.
 
+Provider-side server tool usage is tracked separately from local harness tool calls:
+
+- `RunTelemetry.server_tools_configured` records configured OpenRouter server tools such as `openrouter:web_search`.
+- `RunTelemetry.num_annotations` records how many response annotations OpenRouter returned.
+- `RunTelemetry.num_citations` records how many citation URLs were extracted from the response.
+- `RunTelemetry.num_tool_calls` remains local-harness-only and does not count provider-side server tool execution inside a single OpenRouter response.
+
 ## Usage and cost accounting
 
 The OpenRouter client records usage from the chat completion response:
@@ -52,6 +59,8 @@ GET https://openrouter.ai/api/v1/generation?id=<generation_id>
 ```
 
 Local token estimates are not used for authoritative accounting. If usage is missing, the run should be treated as telemetry-incomplete rather than silently estimated.
+
+Trace JSONL files record configured tools on `llm_call_start` plus raw annotations and extracted citations on `llm_call_end`. Reports can then summarize whether server tools were enabled and how much grounding metadata a run returned.
 
 ## Reproducibility notes
 

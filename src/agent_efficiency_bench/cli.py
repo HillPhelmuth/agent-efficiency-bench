@@ -11,19 +11,27 @@ from rich.table import Table
 
 from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgent
 from agent_efficiency_bench.agents.openrouter_tool_loop import OpenRouterToolLoopAgent
-from agent_efficiency_bench.evaluators.simple import NoOpEvaluator
+from agent_efficiency_bench.evaluators.registry import RegistryEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import (
-    AssistantBenchEvaluator,
     model_config_for_assistantbench_mode,
     native_web_search_tool,
 )
-from agent_efficiency_bench.harnesses.swe_bench import build_swe_bench_eval_command
-from agent_efficiency_bench.harnesses.terminal_bench import build_terminal_bench_command
+from agent_efficiency_bench.harnesses.swe_bench import (
+    DEFAULT_SWE_BENCH_DATASET,
+    build_swe_bench_eval_command,
+    run_swe_bench_evaluation,
+)
+from agent_efficiency_bench.harnesses.tau2_bench import run_tau2_task
+from agent_efficiency_bench.harnesses.terminal_bench import (
+    DEFAULT_TERMINAL_BENCH_DATASET,
+    build_terminal_bench_command,
+    run_terminal_bench_task,
+)
 from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.metrics import aggregate_runs
 from agent_efficiency_bench.providers.openrouter import OpenRouterClient
 from agent_efficiency_bench.reporting import summarize_by_category, summarize_by_dimensions, write_markdown_report
-from agent_efficiency_bench.runner import BenchmarkRunner
+from agent_efficiency_bench.runner import BenchmarkRunner, SuiteBudgetConfig
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
 from agent_efficiency_bench.task_audit import audit_tasks as audit_task_rows, format_audit_markdown
@@ -83,6 +91,11 @@ def run_answer(
     output_dir: str = typer.Option("runs/smoke", help="Output directory for traces and JSONL results."),
     max_completion_tokens: int = typer.Option(2048, help="Per-call max completion tokens."),
     enable_web_search: bool = typer.Option(False, help="Pass native web_search tool configuration to OpenRouter."),
+    n_trials: int = typer.Option(1, help="Repeat each selected task this many times."),
+    max_suite_usd: float | None = typer.Option(None, help="Abort before the next task after this suite spend is reached."),
+    max_suite_seconds: float | None = typer.Option(None, help="Abort before the next task after this suite wall-clock time is reached."),
+    max_suite_tasks: int | None = typer.Option(None, help="Maximum number of tasks to execute in this suite."),
+    max_suite_failures: int | None = typer.Option(None, help="Abort before the next task after this many failed tasks."),
 ) -> None:
     """Run an answer-only OpenRouter baseline over normalized tasks."""
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
@@ -91,8 +104,19 @@ def run_answer(
     agent = OpenRouterAnswerAgent(
         config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
     )
-    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir, tasks_path=tasks)
-    results = runner.run_tasks(selected)
+    runner = BenchmarkRunner(
+        agent=agent,
+        evaluator=RegistryEvaluator(),
+        output_dir=output_dir,
+        tasks_path=tasks,
+        suite_budget=SuiteBudgetConfig(
+            max_suite_estimated_usd=max_suite_usd,
+            max_suite_wall_clock_seconds=max_suite_seconds,
+            max_suite_tasks=max_suite_tasks,
+            max_suite_failures=max_suite_failures,
+        ),
+    )
+    results = runner.run_tasks(selected, n_trials=n_trials)
     console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
 
 
@@ -105,6 +129,11 @@ def run_tool_loop(
     output_dir: str = typer.Option("runs/tool-loop", help="Output directory for traces and JSONL results."),
     max_completion_tokens: int = typer.Option(2048, help="Per-call max completion tokens."),
     enable_web_search: bool = typer.Option(False, help="Pass native web_search tool configuration on the research step."),
+    n_trials: int = typer.Option(1, help="Repeat each selected task this many times."),
+    max_suite_usd: float | None = typer.Option(None, help="Abort before the next task after this suite spend is reached."),
+    max_suite_seconds: float | None = typer.Option(None, help="Abort before the next task after this suite wall-clock time is reached."),
+    max_suite_tasks: int | None = typer.Option(None, help="Maximum number of tasks to execute in this suite."),
+    max_suite_failures: int | None = typer.Option(None, help="Abort before the next task after this many failed tasks."),
 ) -> None:
     """Run a minimal multi-step OpenRouter tool-loop scaffold."""
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
@@ -113,8 +142,19 @@ def run_tool_loop(
     agent = OpenRouterToolLoopAgent(
         config=ModelConfig(model=model, max_completion_tokens=max_completion_tokens, tools=tools)
     )
-    runner = BenchmarkRunner(agent=agent, evaluator=NoOpEvaluator(), output_dir=output_dir, tasks_path=tasks)
-    results = runner.run_tasks(selected)
+    runner = BenchmarkRunner(
+        agent=agent,
+        evaluator=RegistryEvaluator(),
+        output_dir=output_dir,
+        tasks_path=tasks,
+        suite_budget=SuiteBudgetConfig(
+            max_suite_estimated_usd=max_suite_usd,
+            max_suite_wall_clock_seconds=max_suite_seconds,
+            max_suite_tasks=max_suite_tasks,
+            max_suite_failures=max_suite_failures,
+        ),
+    )
+    results = runner.run_tasks(selected, n_trials=n_trials)
     console.print(f"[green]Ran {len(results)} task(s)[/green]; outputs written to {output_dir}")
 
 
@@ -155,13 +195,29 @@ def run_assistantbench(
     limit: int | None = typer.Option(None, help="Maximum AssistantBench tasks to run."),
     output_dir: str = typer.Option("runs/assistantbench", help="Output directory."),
     mode: str = typer.Option("closed_book", help="closed_book or openrouter_web_plugin (native web search)."),
+    n_trials: int = typer.Option(1, help="Repeat each selected task this many times."),
+    max_suite_usd: float | None = typer.Option(None, help="Abort before the next task after this suite spend is reached."),
+    max_suite_seconds: float | None = typer.Option(None, help="Abort before the next task after this suite wall-clock time is reached."),
+    max_suite_tasks: int | None = typer.Option(None, help="Maximum number of tasks to execute in this suite."),
+    max_suite_failures: int | None = typer.Option(None, help="Abort before the next task after this many failed tasks."),
 ) -> None:
     """Run AssistantBench web-research tasks through the OpenRouter answer agent."""
     loaded_tasks = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
     selected = select_tasks(loaded_tasks, category="web_research", limit=limit)
     agent = OpenRouterAnswerAgent(config=model_config_for_assistantbench_mode(model, mode))
-    runner = BenchmarkRunner(agent=agent, evaluator=AssistantBenchEvaluator(), output_dir=output_dir, tasks_path=tasks)
-    runner.run_tasks(selected)
+    runner = BenchmarkRunner(
+        agent=agent,
+        evaluator=RegistryEvaluator(),
+        output_dir=output_dir,
+        tasks_path=tasks,
+        suite_budget=SuiteBudgetConfig(
+            max_suite_estimated_usd=max_suite_usd,
+            max_suite_wall_clock_seconds=max_suite_seconds,
+            max_suite_tasks=max_suite_tasks,
+            max_suite_failures=max_suite_failures,
+        ),
+    )
+    runner.run_tasks(selected, n_trials=n_trials)
     console.print(f"[green]Ran {len(selected)} AssistantBench task(s)[/green]; outputs written to {output_dir}")
 
 
@@ -178,6 +234,38 @@ def terminal_bench_command(
     console.print(" ".join(cmd))
 
 
+@app.command("run-terminal-bench-official")
+def run_terminal_bench_official(
+    task_id: str = typer.Option(..., help="Terminal-Bench task id."),
+    model: str = typer.Option(..., help="OpenRouter model id."),
+    output_dir: str = typer.Option("runs/terminal-bench", help="Harness output directory."),
+    agent: str = typer.Option("terminus-2", help="Terminal-Bench/Harbor agent name."),
+    dataset: str = typer.Option(DEFAULT_TERMINAL_BENCH_DATASET, help="Harbor dataset id."),
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview the command by default; use --execute to run it."),
+    max_suite_usd: float | None = typer.Option(None, help="Optional suite budget metadata to record with the planned run."),
+    max_suite_seconds: float | None = typer.Option(None, help="Optional suite time-budget metadata to record with the planned run."),
+    max_suite_tasks: int | None = typer.Option(None, help="Optional suite task-budget metadata to record with the planned run."),
+    max_suite_failures: int | None = typer.Option(None, help="Optional suite failure-budget metadata to record with the planned run."),
+) -> None:
+    """Dry-run or execute the official Terminal-Bench harness behind an explicit flag."""
+    result = run_terminal_bench_task(
+        task_id=task_id,
+        model=model,
+        output_dir=output_dir,
+        agent=agent,
+        dataset=dataset,
+        dry_run=dry_run,
+        execute=not dry_run,
+        suite_budget={
+            "max_suite_estimated_usd": max_suite_usd,
+            "max_suite_wall_clock_seconds": max_suite_seconds,
+            "max_suite_tasks": max_suite_tasks,
+            "max_suite_failures": max_suite_failures,
+        },
+    )
+    console.print_json(json.dumps(result))
+
+
 @app.command("swe-bench-command")
 def swe_bench_command(
     predictions_path: str = typer.Option(..., help="SWE-bench predictions JSONL path."),
@@ -187,6 +275,64 @@ def swe_bench_command(
     """Print the official SWE-bench evaluation command for predictions."""
     cmd = build_swe_bench_eval_command(predictions_path=predictions_path, run_id=run_id, dataset_name=dataset_name)
     console.print(" ".join(cmd))
+
+
+@app.command("run-swe-bench-official")
+def run_swe_bench_official(
+    predictions_path: str = typer.Option(..., help="SWE-bench predictions JSONL path."),
+    run_id: str = typer.Option("aeb-smoke", help="SWE-bench run id."),
+    dataset_name: str = typer.Option(DEFAULT_SWE_BENCH_DATASET, help="SWE-bench dataset name."),
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview the evaluation command by default; use --execute to run it."),
+    max_suite_usd: float | None = typer.Option(None, help="Optional suite budget metadata to record with the planned run."),
+    max_suite_seconds: float | None = typer.Option(None, help="Optional suite time-budget metadata to record with the planned run."),
+    max_suite_tasks: int | None = typer.Option(None, help="Optional suite task-budget metadata to record with the planned run."),
+    max_suite_failures: int | None = typer.Option(None, help="Optional suite failure-budget metadata to record with the planned run."),
+) -> None:
+    """Dry-run or execute the official SWE-bench evaluation harness behind an explicit flag."""
+    result = run_swe_bench_evaluation(
+        predictions_path=predictions_path,
+        run_id=run_id,
+        dataset_name=dataset_name,
+        dry_run=dry_run,
+        execute=not dry_run,
+        suite_budget={
+            "max_suite_estimated_usd": max_suite_usd,
+            "max_suite_wall_clock_seconds": max_suite_seconds,
+            "max_suite_tasks": max_suite_tasks,
+            "max_suite_failures": max_suite_failures,
+        },
+    )
+    console.print_json(json.dumps(result))
+
+
+@app.command("run-tau2-official")
+def run_tau2_official(
+    task_id: str = typer.Option(..., help="Normalized tau2 task id, e.g. tau2_bench_retail__55."),
+    model: str = typer.Option(..., help="Model identifier passed to the external tau2 runner."),
+    output_dir: str = typer.Option("runs/tau2-official", help="Harness output directory."),
+    runner_module: str | None = typer.Option(None, help="Python module that knows how to run tau2 tasks. Required for --execute."),
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview the planned run by default; use --execute to run it."),
+    max_suite_usd: float | None = typer.Option(None, help="Optional suite budget metadata to record with the planned run."),
+    max_suite_seconds: float | None = typer.Option(None, help="Optional suite time-budget metadata to record with the planned run."),
+    max_suite_tasks: int | None = typer.Option(None, help="Optional suite task-budget metadata to record with the planned run."),
+    max_suite_failures: int | None = typer.Option(None, help="Optional suite failure-budget metadata to record with the planned run."),
+) -> None:
+    """Dry-run or execute a tau2-style workflow when a concrete runner module is available."""
+    result = run_tau2_task(
+        task_id=task_id,
+        model=model,
+        output_dir=output_dir,
+        runner_module=runner_module,
+        dry_run=dry_run,
+        execute=not dry_run,
+        suite_budget={
+            "max_suite_estimated_usd": max_suite_usd,
+            "max_suite_wall_clock_seconds": max_suite_seconds,
+            "max_suite_tasks": max_suite_tasks,
+            "max_suite_failures": max_suite_failures,
+        },
+    )
+    console.print_json(json.dumps(result))
 
 
 @app.command("report")

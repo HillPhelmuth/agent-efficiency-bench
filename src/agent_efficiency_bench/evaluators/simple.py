@@ -6,9 +6,18 @@ from typing import Any
 from agent_efficiency_bench.evaluators.base import EvaluationScore
 
 
-class NoOpEvaluator:
+class UnevaluatedEvaluator:
+    def __init__(self, reason: str = "No evaluator configured", details: dict[str, Any] | None = None):
+        self.reason = reason
+        self.details = details or {}
+
     def evaluate(self, task: Any, result: Any) -> EvaluationScore:
-        return EvaluationScore(success=False, quality_score=0.0, reason="No evaluator configured")
+        return EvaluationScore(evaluated=False, success=False, quality_score=0.0, reason=self.reason, details=self.details)
+
+
+class NoOpEvaluator(UnevaluatedEvaluator):
+    def evaluate(self, task: Any, result: Any) -> EvaluationScore:
+        return super().evaluate(task=task, result=result)
 
 
 class ExactAnswerEvaluator:
@@ -22,6 +31,7 @@ class ExactAnswerEvaluator:
         actual = str(output.get("answer") or "")
         success = _normalize_text(actual) == _normalize_text(self.expected)
         return EvaluationScore(
+            evaluated=True,
             success=success,
             quality_score=1.0 if success else 0.0,
             reason="exact match" if success else "answer mismatch",

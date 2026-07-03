@@ -97,6 +97,8 @@ class RunTelemetry(BaseModel):
     agent: str
     model: str
     scaffold: str | None = None
+    trial_index: int | None = None
+    server_tools_configured: list[str] = Field(default_factory=list)
     success: bool
     quality_score: float = Field(ge=0.0, le=1.0)
     wall_clock_seconds: float = Field(ge=0.0)
@@ -111,6 +113,8 @@ class RunTelemetry(BaseModel):
     num_terminal_commands: int = Field(default=0, ge=0)
     num_retries: int = Field(default=0, ge=0)
     num_errors: int = Field(default=0, ge=0)
+    num_citations: int = Field(default=0, ge=0)
+    num_annotations: int = Field(default=0, ge=0)
     terminated_by: str | None = None
 
     @property
@@ -126,9 +130,12 @@ class RunManifest(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     tasks_path: str | None = None
     task_ids: list[str] = Field(default_factory=list)
+    trial_count: int = 1
+    trial_indices: list[int] = Field(default_factory=list)
     scaffold: str | None = None
     tools_configured: list[str] = Field(default_factory=list)
     budget: dict[str, Any] = Field(default_factory=dict)
+    suite_budget: dict[str, Any] = Field(default_factory=dict)
     git_commit: str | None = None
     environment: dict[str, Any] = Field(default_factory=dict)
 

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 import json
 import os
 import platform
 import subprocess
 import sys
+import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +16,14 @@ from agent_efficiency_bench.agents.base import Agent
 from agent_efficiency_bench.evaluators.base import Evaluator
 from agent_efficiency_bench.io import write_jsonl
 from agent_efficiency_bench.schemas import BenchmarkTask, RunManifest, RunResult
+
+
+@dataclass
+class SuiteBudgetConfig:
+    max_suite_estimated_usd: float | None = None
+    max_suite_wall_clock_seconds: float | None = None
+    max_suite_tasks: int | None = None
+    max_suite_failures: int | None = None
 
 
 class BenchmarkRunner:
@@ -23,6 +34,8 @@ class BenchmarkRunner:
         output_dir: str | Path,
         tasks_path: str | None = None,
         run_suite_id: str | None = None,
+        suite_budget: SuiteBudgetConfig | None = None,
+        time_fn: Callable[[], float] | None = None,
     ):
         self.agent = agent
         self.evaluator = evaluator
@@ -35,25 +48,59 @@ class BenchmarkRunner:
         self.run_suite_id = run_suite_id or f"suite-{uuid.uuid4().hex[:12]}"
         self.task_ids: list[str] = []
         self.budgets: list[dict[str, Any]] = []
+        self.suite_budget = suite_budget or SuiteBudgetConfig()
+        self.time_fn = time_fn or time.perf_counter
+        self.suite_started_at = self.time_fn()
+        self.suite_tasks_completed = 0
+        self.suite_failures = 0
+        self.suite_estimated_usd = 0.0
+        self.suite_terminated_by: str | None = None
+        self.requested_trial_count = 1
+        self.executed_trial_indices: set[int] = set()
 
-    def run_task(self, task: BenchmarkTask) -> RunResult:
+    def run_task(self, task: BenchmarkTask, trial_index: int | None = None) -> RunResult:
         artifact_dir = self.output_dir / task.task_id
+        if trial_index is not None and self.requested_trial_count > 1:
+            artifact_dir = artifact_dir / f"trial-{trial_index:03d}"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
         result = self.agent.run(task, artifact_dir=artifact_dir)
+        if trial_index is not None:
+            result.telemetry.trial_index = trial_index
+            result.telemetry.run_id = f"{result.telemetry.run_id}__trial_{trial_index:03d}"
         score = self.evaluator.evaluate(task, result)
         result.telemetry.success = score.success
         result.telemetry.quality_score = score.quality_score
-        if result.telemetry.terminated_by == "not_evaluated":
+        if not score.evaluated and result.telemetry.terminated_by is None:
+            result.telemetry.terminated_by = "not_evaluated"
+        elif result.telemetry.terminated_by == "not_evaluated" and score.evaluated:
             result.telemetry.terminated_by = "success" if score.success else "evaluated"
         result.output["evaluation"] = score.model_dump(exclude_none=True)
         self._append_result(result)
         self.task_ids.append(task.task_id)
         self.budgets.append(task.budgets.model_dump())
+        if trial_index is not None:
+            self.executed_trial_indices.add(trial_index)
+        self._record_suite_result(result)
         self._write_manifest()
         return result
 
-    def run_tasks(self, tasks: list[BenchmarkTask], limit: int | None = None) -> list[RunResult]:
+    def run_tasks(self, tasks: list[BenchmarkTask], limit: int | None = None, n_trials: int = 1) -> list[RunResult]:
         selected = tasks[:limit] if limit is not None else tasks
-        return [self.run_task(task) for task in selected]
+        self.requested_trial_count = max(n_trials, 1)
+        results: list[RunResult] = []
+        for task in selected:
+            for trial_index in range(self.requested_trial_count):
+                reason = self._suite_limit_reason()
+                if reason is not None:
+                    self.suite_terminated_by = reason
+                    break
+                results.append(self.run_task(task, trial_index=trial_index if self.requested_trial_count > 1 else None))
+                if self.suite_terminated_by is not None:
+                    break
+            if self.suite_terminated_by is not None:
+                break
+        self._write_manifest()
+        return results
 
     def _append_result(self, result: RunResult) -> None:
         existing_results = []
@@ -74,13 +121,60 @@ class BenchmarkRunner:
             output_dir=str(self.output_dir),
             tasks_path=self.tasks_path,
             task_ids=self.task_ids,
+            trial_count=self.requested_trial_count,
+            trial_indices=sorted(self.executed_trial_indices),
             scaffold=getattr(self.agent, "scaffold", None),
             tools_configured=_tool_names(getattr(config, "tools", None)),
             budget=_budget_summary(self.budgets),
+            suite_budget=self._suite_budget_summary(),
             git_commit=_git_commit(),
             environment=_environment_info(),
         )
         self.manifest_path.write_text(manifest.model_dump_json(exclude_none=True, indent=2), encoding="utf-8")
+
+    def _record_suite_result(self, result: RunResult) -> None:
+        self.suite_tasks_completed += 1
+        self.suite_estimated_usd += result.telemetry.estimated_usd
+        if not result.telemetry.success:
+            self.suite_failures += 1
+        reason = self._suite_limit_reason()
+        if reason is not None:
+            self.suite_terminated_by = reason
+
+    def _suite_elapsed_seconds(self) -> float:
+        return self.time_fn() - self.suite_started_at
+
+    def _suite_limit_reason(self) -> str | None:
+        if self.suite_terminated_by is not None:
+            return self.suite_terminated_by
+        if self.suite_budget.max_suite_tasks is not None and self.suite_tasks_completed >= self.suite_budget.max_suite_tasks:
+            return "suite_budget_tasks"
+        if self.suite_budget.max_suite_failures is not None and self.suite_failures >= self.suite_budget.max_suite_failures:
+            return "suite_budget_failures"
+        if self.suite_budget.max_suite_estimated_usd is not None and self.suite_estimated_usd >= self.suite_budget.max_suite_estimated_usd:
+            return "suite_budget_cost"
+        if (
+            self.suite_budget.max_suite_wall_clock_seconds is not None
+            and self._suite_elapsed_seconds() >= self.suite_budget.max_suite_wall_clock_seconds
+        ):
+            return "suite_budget_time"
+        return None
+
+    def _suite_budget_summary(self) -> dict[str, Any]:
+        limits = {key: value for key, value in asdict(self.suite_budget).items() if value is not None}
+        if not limits and self.suite_tasks_completed == 0 and self.suite_failures == 0 and self.suite_estimated_usd == 0.0:
+            return {}
+        return {
+            "limits": limits,
+            "observed": {
+                "tasks_completed": self.suite_tasks_completed,
+                "failures": self.suite_failures,
+                "estimated_usd": self.suite_estimated_usd,
+                "wall_clock_seconds": self._suite_elapsed_seconds(),
+            },
+            "terminated_by": self.suite_terminated_by,
+            "aborted": self.suite_terminated_by is not None,
+        }
 
 
 def _read_existing(path: Path) -> list[Any]:

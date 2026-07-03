@@ -63,15 +63,19 @@ The two manifests have matching task IDs, agent, requested model, returned model
 2. **OpenRouter returned grounding metadata.** The web-search trace captured both raw annotations and extracted citation URLs.
 3. **Server-side search is expensive relative to closed-book on this task.** The web-search run used about 70.9x more total tokens and about 139.4x more estimated USD than closed-book.
 4. **Web search changed the answer but did not improve correctness for this task.** The searched answer was more grounded, but still failed the expected exact answer.
-5. **Current telemetry does not count provider-side server tools as `num_tool_calls`.** This is expected in the current implementation but should be represented separately in future reporting, e.g. `server_tools_configured` or `server_tool_observations`.
+5. **Current telemetry keeps provider-side search separate from local tool-call counts.** `num_tool_calls` remains `0` for this run because OpenRouter server-side search is not a local harness tool call. Current code now records provider-side search separately through `server_tools_configured`, `num_annotations`, and `num_citations`.
 
 ## Telemetry Gaps / Follow-up Issues
 
-- `RunManifest.budget` and `RunManifest.environment` are still empty; this is already tracked as Task 2 in `plan-state.md`.
-- `RunTelemetry.scaffold` is currently omitted/null, making scaffold-level reporting weaker; this is tracked in Task 9.
-- `num_tool_calls` only tracks local harness tools and does not represent OpenRouter server-side tool use.
+The points below describe historical calibration artifacts from an earlier run snapshot. Some of these gaps have since been addressed in the current codebase, but the raw calibration runs reviewed here predate those changes.
+
+- Historical artifact: the raw calibration manifests had empty `RunManifest.budget` and `RunManifest.environment` fields at the time these runs were produced. Current code now populates those manifest fields.
+- Historical artifact: the raw calibration telemetry did not populate `RunTelemetry.scaffold`, making scaffold-level reporting weaker in these specific runs.
+- `num_tool_calls` only tracks local harness tools by design. Current code now complements that with provider-side `server_tools_configured`, `num_annotations`, and `num_citations` fields.
 - Exact-match evaluation is too brittle for many web-research tasks. This task likely needs a more structured evaluator that can account for cited sources, candidate entities, and partial correctness.
 - Reporting currently requires manual side-by-side comparison for separate run directories; grouped reporting by model/scaffold/tools is tracked in Task 3.
+
+Current-code note: the regenerated AssistantBench dev subset now carries deterministic `raw.expected` metadata when answer text is available, so current local runs can use structured checks such as `text_contains` plus citation requirements instead of relying only on exact-match fallback.
 
 ## Verification
 

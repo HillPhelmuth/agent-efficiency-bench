@@ -47,6 +47,16 @@ def test_tool_loop_agent_runs_research_and_final_llm_calls(tmp_path):
         FakeResponse("research notes", prompt_tokens=11, completion_tokens=7, cost_usd=0.02, generation_id="research"),
         FakeResponse("final answer", prompt_tokens=13, completion_tokens=3, cost_usd=0.01, generation_id="final"),
     ])
+    client.responses[0].raw = {
+        "choices": [
+            {"message": {"annotations": [{"type": "url_citation", "url_citation": {"url": "https://example.com/research"}}]}}
+        ]
+    }
+    client.responses[1].raw = {
+        "choices": [
+            {"message": {"annotations": [{"type": "url_citation", "url_citation": {"url": "https://example.com/final"}}]}}
+        ]
+    }
     agent = OpenRouterToolLoopAgent(client=client, config=ModelConfig(model="fake/model", tools=[tool]))
 
     result = agent.run(make_task(), artifact_dir=tmp_path)
@@ -58,6 +68,10 @@ def test_tool_loop_agent_runs_research_and_final_llm_calls(tmp_path):
     assert result.telemetry.input_tokens == 24
     assert result.telemetry.output_tokens == 10
     assert result.telemetry.estimated_usd == 0.03
+    assert result.telemetry.server_tools_configured == ["openrouter:web_search"]
+    assert result.telemetry.num_annotations == 2
+    assert result.telemetry.num_citations == 2
+    assert result.telemetry.num_tool_calls == 0
     assert client.calls[0]["tools"] == [tool]
     assert client.calls[1]["tools"] is None
 

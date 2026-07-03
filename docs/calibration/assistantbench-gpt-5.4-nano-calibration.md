@@ -89,14 +89,16 @@ Web-search trace observations:
 3. OpenRouter returned citation metadata in the web-search run, and the harness captured both raw annotations and extracted citation URLs.
 4. Web search substantially increased cost and token usage on this task: total tokens increased from `259` to `18,356`, and estimated cost increased from `$0.00024255` to `$0.0338095395`.
 5. Web search produced a more grounded answer but did not improve exact-answer correctness on this specific task.
-6. `num_tool_calls` remains `0` because OpenRouter server-side search is not a local harness tool call; reporting should continue to distinguish local tool calls from provider-side server tool availability/metadata.
+6. `num_tool_calls` remains `0` because OpenRouter server-side search is not a local harness tool call. Current code now distinguishes that provider-side activity through `server_tools_configured`, `num_annotations`, and `num_citations`.
 
 ## Known Limitations
 
 - The current exact-match evaluator is too brittle for this web-research style task.
-- The run predated manifest budget/environment population, so the raw calibration manifests still show empty `budget` and `environment` fields.
-- Scaffold identity is still not populated in telemetry.
+- Historical artifact: these raw calibration runs predated manifest budget/environment population, so the raw manifests still show empty `budget` and `environment` fields even though current code now fills them.
+- Historical artifact: scaffold identity was not populated in telemetry for these runs.
 - This is a single-task calibration and should not be interpreted as a stable model ranking.
+
+Current-code note: the regenerated AssistantBench dev subset now adds deterministic `raw.expected` metadata when answer text is available, enabling structured local evaluation with citation requirements on current runs.
 
 ## Next Recommended Experiment
 

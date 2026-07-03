@@ -54,6 +54,10 @@ def test_answer_agent_returns_output_and_usage(tmp_path):
     assert result.telemetry.output_tokens == 5
     assert result.telemetry.estimated_usd == 0.01
     assert result.telemetry.scaffold == "answer-only"
+    assert result.telemetry.server_tools_configured == []
+    assert result.telemetry.num_annotations == 1
+    assert result.telemetry.num_citations == 1
+    assert result.telemetry.num_tool_calls == 0
     assert result.telemetry.success is False
     assert result.trace_path.endswith("trace.jsonl")
 
@@ -79,6 +83,7 @@ def test_answer_agent_uses_web_search_scaffold_when_openrouter_web_search_config
     result = agent.run(make_task(requires_external_search=True), artifact_dir=tmp_path)
 
     assert result.telemetry.scaffold == "web-search-answer"
+    assert result.telemetry.server_tools_configured == ["openrouter:web_search"]
 
 
 def test_answer_agent_traces_configured_tools_and_response_annotations(tmp_path):
@@ -95,6 +100,9 @@ def test_answer_agent_traces_configured_tools_and_response_annotations(tmp_path)
     assert start["data"]["tools_configured"] == ["openrouter:web_search"]
     assert end["data"]["annotations"] == [{"type": "url_citation", "url_citation": {"url": "https://example.com"}}]
     assert end["data"]["citations"] == ["https://example.com"]
+    assert result.telemetry.num_annotations == 1
+    assert result.telemetry.num_citations == 1
+    assert result.telemetry.num_tool_calls == 0
 
 
 def test_answer_agent_traces_budget_checks_when_budget_passes(tmp_path):

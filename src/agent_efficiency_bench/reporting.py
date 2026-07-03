@@ -55,6 +55,8 @@ def _dimension_value(
         return run.agent
     if dimension == "scaffold":
         return run.scaffold or "unknown"
+    if dimension == "trial_index":
+        return str(run.trial_index) if run.trial_index is not None else "none"
     if dimension == "horizon":
         return str((task.get("complexity") or {}).get("horizon", "unknown"))
     if dimension == "requires_external_search":
@@ -62,7 +64,10 @@ def _dimension_value(
         return str(value).lower()
     if dimension == "tools_enabled":
         manifest = manifests.get(run.run_id) or manifests.get("*") or {}
-        value = bool(manifest.get("tools_configured"))
+        configured = manifest.get("tools_configured")
+        if configured is None:
+            configured = run.server_tools_configured
+        value = bool(configured)
         return str(value).lower()
     return "unknown"
 
@@ -77,8 +82,17 @@ def _summary_for_runs(runs: list[RunTelemetry]) -> dict[str, Any]:
             "p95_cost_usd": _percentile(costs, 0.95),
             "p50_latency_seconds": _percentile(latencies, 0.50),
             "p95_latency_seconds": _percentile(latencies, 0.95),
+            "mean_cost_usd": statistics.mean(costs) if costs else 0.0,
+            "stdev_cost_usd": statistics.stdev(costs) if len(costs) > 1 else 0.0,
+            "stdev_latency_seconds": statistics.stdev(latencies) if len(latencies) > 1 else 0.0,
+            "stdev_total_tokens": statistics.stdev([run.total_tokens for run in runs]) if len(runs) > 1 else 0.0,
+            "stdev_quality": statistics.stdev([run.quality_score for run in runs]) if len(runs) > 1 else 0.0,
             "retry_rate": sum(run.num_retries for run in runs) / len(runs) if runs else 0.0,
             "error_rate": sum(1 for run in runs if run.num_errors > 0) / len(runs) if runs else 0.0,
+            "total_citations": sum(run.num_citations for run in runs),
+            "avg_citations": sum(run.num_citations for run in runs) / len(runs) if runs else 0.0,
+            "total_annotations": sum(run.num_annotations for run in runs),
+            "avg_annotations": sum(run.num_annotations for run in runs) / len(runs) if runs else 0.0,
         }
     )
     return aggregate

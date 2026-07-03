@@ -55,7 +55,7 @@ def test_summarize_by_dimensions_groups_by_category_model_and_tools_enabled():
     assert summary[key]["cost_per_success"] == 0.10
 
 
-def test_summarize_by_dimensions_falls_back_to_tools_disabled_without_manifest():
+def test_summarize_by_dimensions_falls_back_to_server_tools_without_manifest():
     tasks = {"t1": {"category": "web_research", "source": "AssistantBench", "complexity": {"horizon": "short"}}}
     runs = [
         RunTelemetry(
@@ -63,6 +63,7 @@ def test_summarize_by_dimensions_falls_back_to_tools_disabled_without_manifest()
             task_id="t1",
             agent="openrouter-answer",
             model="openai/gpt-5.4-nano",
+            server_tools_configured=["openrouter:web_search"],
             success=False,
             quality_score=0.0,
             wall_clock_seconds=10,
@@ -74,7 +75,7 @@ def test_summarize_by_dimensions_falls_back_to_tools_disabled_without_manifest()
 
     summary = summarize_by_dimensions(tasks, runs, ["tools_enabled"])
 
-    assert "tools_enabled=false" in summary
+    assert "tools_enabled=true" in summary
 
 
 def test_summarize_by_dimensions_groups_by_scaffold():
@@ -98,3 +99,71 @@ def test_summarize_by_dimensions_groups_by_scaffold():
     summary = summarize_by_dimensions(tasks, runs, ["scaffold"])
 
     assert "scaffold=web-search-answer" in summary
+
+
+def test_summarize_by_dimensions_groups_by_trial_index_and_reports_variance():
+    tasks = {"t1": {"category": "web_research", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1__trial_000",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            trial_index=0,
+            success=True,
+            quality_score=1.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+        ),
+        RunTelemetry(
+            run_id="r1__trial_001",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            trial_index=1,
+            success=True,
+            quality_score=0.5,
+            wall_clock_seconds=14,
+            input_tokens=110,
+            output_tokens=30,
+            estimated_usd=0.14,
+        ),
+    ]
+
+    grouped = summarize_by_dimensions(tasks, runs, ["trial_index"])
+    overall = summarize_by_dimensions(tasks, runs, ["category"])
+
+    assert "trial_index=0" in grouped
+    assert "trial_index=1" in grouped
+    assert overall["category=web_research"]["stdev_cost_usd"] > 0.0
+    assert overall["category=web_research"]["stdev_latency_seconds"] > 0.0
+    assert overall["category=web_research"]["stdev_total_tokens"] > 0.0
+    assert overall["category=web_research"]["stdev_quality"] > 0.0
+
+
+def test_summarize_by_dimensions_includes_citation_and_annotation_totals():
+    tasks = {"t1": {"category": "web_research", "source": "AssistantBench", "complexity": {"horizon": "short"}}}
+    runs = [
+        RunTelemetry(
+            run_id="r1",
+            task_id="t1",
+            agent="openrouter-answer",
+            model="openai/gpt-5.4-nano",
+            server_tools_configured=["openrouter:web_search"],
+            success=True,
+            quality_score=1.0,
+            wall_clock_seconds=10,
+            input_tokens=100,
+            output_tokens=20,
+            estimated_usd=0.10,
+            num_citations=2,
+            num_annotations=3,
+        )
+    ]
+
+    summary = summarize_by_dimensions(tasks, runs, ["category"])
+
+    assert summary["category=web_research"]["total_citations"] == 2
+    assert summary["category=web_research"]["total_annotations"] == 3

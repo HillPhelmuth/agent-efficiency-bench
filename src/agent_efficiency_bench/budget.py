@@ -72,6 +72,9 @@ class BudgetTracker:
         success: bool,
         quality_score: float,
         scaffold: str | None = None,
+        server_tools_configured: list[str] | None = None,
+        num_citations: int = 0,
+        num_annotations: int = 0,
         terminated_by: str | None = None,
     ) -> RunTelemetry:
         return RunTelemetry(
@@ -80,6 +83,7 @@ class BudgetTracker:
             agent=agent,
             model=model,
             scaffold=scaffold,
+            server_tools_configured=server_tools_configured or [],
             success=success,
             quality_score=quality_score,
             wall_clock_seconds=self.elapsed_seconds(),
@@ -94,5 +98,7 @@ class BudgetTracker:
             num_terminal_commands=self.num_terminal_commands,
             num_retries=self.num_retries,
             num_errors=self.num_errors,
+            num_citations=num_citations,
+            num_annotations=num_annotations,
             terminated_by=terminated_by or self.termination_reason(),
         )

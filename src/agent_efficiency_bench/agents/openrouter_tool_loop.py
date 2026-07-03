@@ -34,6 +34,8 @@ class OpenRouterToolLoopAgent:
         trace_path = artifact_path / "trace.jsonl"
         recorder = TraceRecorder(trace_path, run_id=run_id, task_id=task.task_id)
         budget = BudgetTracker(task.budgets)
+        annotation_count = 0
+        citation_count = 0
         recorder.emit("task_start", data={"agent": self.name, "model": self.model, "scaffold": self.scaffold})
 
         research_messages = [
@@ -48,6 +50,8 @@ class OpenRouterToolLoopAgent:
             tool_choice=self.config.tool_choice,
             phase="research",
         )
+        annotation_count += len(_response_annotations(research.raw))
+        citation_count += len(_response_citations(research.raw))
         termination = budget.termination_reason()
         if termination:
             budget_data = _budget_check_data(budget, termination)
@@ -62,6 +66,8 @@ class OpenRouterToolLoopAgent:
                 response=research,
                 answer=research.content,
                 research=research.content,
+                annotation_count=annotation_count,
+                citation_count=citation_count,
                 termination=termination,
             )
 
@@ -79,6 +85,8 @@ class OpenRouterToolLoopAgent:
             tool_choice=None,
             phase="final",
         )
+        annotation_count += len(_response_annotations(final.raw))
+        citation_count += len(_response_citations(final.raw))
         termination = budget.termination_reason() or "not_evaluated"
         recorder.emit("task_end", data={"terminated_by": termination})
         return self._result(
@@ -90,6 +98,8 @@ class OpenRouterToolLoopAgent:
             response=final,
             answer=final.content,
             research=research.content,
+            annotation_count=annotation_count,
+            citation_count=citation_count,
             termination=termination,
         )
 
@@ -150,6 +160,8 @@ class OpenRouterToolLoopAgent:
         response: OpenRouterResponse,
         answer: str,
         research: str,
+        annotation_count: int,
+        citation_count: int,
         termination: str,
     ) -> RunResult:
         telemetry = budget.to_run_telemetry(
@@ -158,8 +170,11 @@ class OpenRouterToolLoopAgent:
             agent=self.name,
             model=response.model or self.model,
             scaffold=self.scaffold,
+            server_tools_configured=_tool_names(self.config.tools),
             success=False,
             quality_score=0.0,
+            num_citations=citation_count,
+            num_annotations=annotation_count,
             terminated_by=termination,
         )
         return RunResult(

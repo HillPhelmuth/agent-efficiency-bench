@@ -23,6 +23,25 @@ def test_assistantbench_uses_raw_answer_when_available():
     assert evaluator.evaluate_output({"answer": "paris"}).success is True
 
 
+def test_assistantbench_exact_fallback_remains_when_expected_metadata_is_absent():
+    task = BenchmarkTask(
+        task_id="assistantbench__fallback",
+        source="AssistantBench/AssistantBench",
+        source_type="huggingface",
+        category="web_research",
+        instruction="Q?",
+        environment={"type": "web"},
+        complexity=Complexity(horizon="short"),
+        budgets=Budget(),
+        success_criteria=SuccessCriteria(type="structured_answer"),
+        raw={"answer": "Paris"},
+    )
+
+    evaluator = evaluator_for_assistantbench_task(task)
+
+    assert evaluator.evaluate_output({"answer": "paris"}).success is True
+
+
 def test_assistantbench_web_mode_configures_native_web_search_tool():
     config = model_config_for_assistantbench_mode("openai/gpt-5.4-nano", "openrouter_web_plugin")
     assert config.model == "openai/gpt-5.4-nano"

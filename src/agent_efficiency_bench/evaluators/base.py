@@ -8,6 +8,7 @@ from agent_efficiency_bench.schemas import BenchmarkTask, RunResult
 
 
 class EvaluationScore(BaseModel):
+    evaluated: bool = True
     success: bool
     quality_score: float = Field(ge=0.0, le=1.0)
     reason: str | None = None

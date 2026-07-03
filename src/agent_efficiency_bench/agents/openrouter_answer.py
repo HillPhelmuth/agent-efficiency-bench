@@ -56,6 +56,9 @@ class OpenRouterAnswerAgent:
             cost_usd=response.cost_usd,
             latency_seconds=latency,
         )
+        annotations = _response_annotations(response.raw)
+        citations = _response_citations(response.raw)
+        server_tools = _tool_names(self.config.tools)
         recorder.emit(
             "llm_call_end",
             data={
@@ -67,8 +70,8 @@ class OpenRouterAnswerAgent:
                 "cost_usd": response.cost_usd,
                 "latency_seconds": latency,
                 "finish_reason": response.finish_reason,
-                "annotations": _response_annotations(response.raw),
-                "citations": _response_citations(response.raw),
+                "annotations": annotations,
+                "citations": citations,
             },
         )
         termination = budget.termination_reason()
@@ -83,8 +86,11 @@ class OpenRouterAnswerAgent:
             agent=self.name,
             model=response.model or self.model,
             scaffold=self.scaffold,
+            server_tools_configured=server_tools,
             success=False,
             quality_score=0.0,
+            num_citations=len(citations),
+            num_annotations=len(annotations),
             terminated_by=termination,
         )
         recorder.emit("task_end", data={"terminated_by": telemetry.terminated_by})

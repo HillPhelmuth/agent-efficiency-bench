@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from agent_efficiency_bench.scoring import coerce_quality_score
+
 
 DEFAULT_TERMINAL_BENCH_DATASET = "terminal-bench/terminal-bench-2-1"
 
@@ -105,7 +107,7 @@ def parse_terminal_bench_result(path: str | Path) -> dict[str, Any]:
     details = raw.get("details") if isinstance(raw, dict) else None
     return {
         "success": bool(success) if success is not None else False,
-        "quality_score": float(quality_score) if quality_score is not None else (1.0 if success else 0.0),
+        "quality_score": coerce_quality_score(quality_score, success=bool(success) if success is not None else False),
         "status": str(status) if status is not None else None,
         "details": details if isinstance(details, dict) else {},
         "raw": raw,

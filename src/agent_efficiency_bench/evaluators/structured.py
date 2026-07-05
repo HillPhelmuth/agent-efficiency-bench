@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from agent_efficiency_bench.evaluators.base import EvaluationScore
+from agent_efficiency_bench.scoring import LIKERT_SCORE_MIN, normalized_to_likert
 
 
 class StructuredAnswerEvaluator:
@@ -31,7 +32,7 @@ class StructuredAnswerEvaluator:
         success = total > 0 and passed == total
         return EvaluationScore(
             success=success,
-            quality_score=passed / total if total else 0.0,
+            quality_score=normalized_to_likert(passed / total) if total else LIKERT_SCORE_MIN,
             reason="structured checks passed" if success else "structured checks failed",
             details={"checks": checks, "passed_checks": passed, "total_checks": total},
         )

@@ -4,6 +4,7 @@ from agent_efficiency_bench.evaluators.base import EvaluationScore
 from agent_efficiency_bench.evaluators.simple import ExactAnswerEvaluator, UnevaluatedEvaluator
 from agent_efficiency_bench.evaluators.structured import StructuredAnswerEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import AssistantBenchEvaluator
+from agent_efficiency_bench.scoring import coerce_quality_score
 from agent_efficiency_bench.schemas import BenchmarkTask, RunResult
 
 
@@ -21,7 +22,7 @@ class OfficialHarnessResultEvaluator:
             ).evaluate(task, result)
 
         success = _harness_success(harness_result)
-        quality_score = float(harness_result.get("quality_score", 1.0 if success else 0.0))
+        quality_score = coerce_quality_score(harness_result.get("quality_score"), success=success)
         details = dict(harness_result.get("details") or {})
         if "raw" in harness_result:
             details.setdefault("raw", harness_result["raw"])

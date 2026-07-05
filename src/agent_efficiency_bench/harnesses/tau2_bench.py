@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from agent_efficiency_bench.scoring import coerce_quality_score
+
 
 UNRESOLVED_TAU2_RUNNER = "<tau2-runner-module-required>"
 
@@ -140,7 +142,7 @@ def parse_tau2_result(path: str | Path) -> dict[str, Any]:
         success = bool(total_actions > 0 and passed_actions == total_actions)
     return {
         "success": bool(success),
-        "quality_score": float(quality_score) if quality_score is not None else (1.0 if success else 0.0),
+        "quality_score": coerce_quality_score(quality_score, success=bool(success)),
         "passed_actions": passed_actions,
         "total_actions": total_actions,
         "details": raw.get("details") if isinstance(raw.get("details"), dict) else {},

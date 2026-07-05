@@ -34,7 +34,7 @@ def test_structured_evaluator_passes_text_number_domain_and_citation_checks():
     score = evaluator.evaluate(None, make_result("Potash Markets salad costs $14.99", ["https://www.potashmarkets.com/salads"]))
 
     assert score.success is True
-    assert score.quality_score == 1.0
+    assert score.quality_score == 5.0
     assert score.details["checks"]["text_contains"][0]["passed"] is True
     assert score.details["checks"]["numbers"][0]["passed"] is True
     assert score.details["checks"]["required_domains"][0]["passed"] is True
@@ -47,7 +47,7 @@ def test_structured_evaluator_reports_partial_failure_details():
     score = evaluator.evaluate(None, make_result("Potash Markets has salads."))
 
     assert score.success is False
-    assert 0.0 < score.quality_score < 1.0
+    assert 1.0 < score.quality_score < 5.0
     assert score.reason == "structured checks failed"
     assert score.details["checks"]["text_contains"][1]["passed"] is False
 

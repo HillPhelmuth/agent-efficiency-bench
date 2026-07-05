@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from agent_efficiency_bench.evaluators.base import EvaluationScore
+from agent_efficiency_bench.scoring import UNEVALUATED_QUALITY_SCORE, likert_score
 
 
 class UnevaluatedEvaluator:
@@ -12,7 +13,13 @@ class UnevaluatedEvaluator:
         self.details = details or {}
 
     def evaluate(self, task: Any, result: Any) -> EvaluationScore:
-        return EvaluationScore(evaluated=False, success=False, quality_score=0.0, reason=self.reason, details=self.details)
+        return EvaluationScore(
+            evaluated=False,
+            success=False,
+            quality_score=UNEVALUATED_QUALITY_SCORE,
+            reason=self.reason,
+            details=self.details,
+        )
 
 
 class NoOpEvaluator(UnevaluatedEvaluator):
@@ -33,7 +40,7 @@ class ExactAnswerEvaluator:
         return EvaluationScore(
             evaluated=True,
             success=success,
-            quality_score=1.0 if success else 0.0,
+            quality_score=likert_score(success),
             reason="exact match" if success else "answer mismatch",
             details={"expected": self.expected, "actual": actual},
         )

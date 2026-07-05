@@ -146,15 +146,15 @@ def test_answer_agent_provider_citations_are_visible_to_structured_evaluator(tmp
             return CorrectAnswerResponse()
 
     task = BenchmarkTask(
-        task_id="assistantbench__citation_regression",
-        source="AssistantBench/AssistantBench",
-        source_type="huggingface",
+        task_id="custom__citation_regression",
+        source="custom-web-research",
+        source_type="custom",
         category="web_research",
         instruction="Which store has the salad?",
         environment={"type": "web"},
         complexity=Complexity(horizon="short", requires_external_search=True),
         budgets=Budget(),
-        success_criteria=SuccessCriteria(type="structured_answer", checker="assistantbench_exact_or_rubric"),
+        success_criteria=SuccessCriteria(type="structured_answer"),
         raw={"expected": {"text_contains": ["Potash Markets - Clark Street"], "requires_citation": True}},
     )
     agent = OpenRouterAnswerAgent(client=CorrectAnswerClient(), config=ModelConfig(model="fake/model"))
@@ -163,5 +163,5 @@ def test_answer_agent_provider_citations_are_visible_to_structured_evaluator(tmp
     result = runner.run_task(task)
 
     assert result.telemetry.success is True
-    assert result.telemetry.quality_score == 1.0
+    assert result.telemetry.quality_score == 5.0
     assert result.output["evaluation"]["details"]["checks"]["requires_citation"]["passed"] is True

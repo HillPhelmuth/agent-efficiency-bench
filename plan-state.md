@@ -592,3 +592,40 @@ Actual `runs/api` review found 23 web-research result rows, all marked failed. S
 `chart_summary_for_runs()` now prefers sibling `run_results.jsonl` files when available, re-evaluates each `RunResult` against the current task metadata, and summarizes the updated telemetry. This lets the API/dashboard reflect evaluator fixes for existing `runs/api` artifacts instead of staying pinned to stale success flags in `run_telemetry.jsonl`. Re-evaluating the current `runs/api` web-research artifacts now shows non-zero success: `minimax/minimax-m3-20260531` at `3/12` successes (`25%`) and `openai/gpt-5.4-nano-20260317` at `3/11` successes (`27.27%`).
 
 Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_structured_evaluator.py tests/test_api.py -q` (`12 passed`), direct re-evaluation of `runs/api` artifacts via `chart_summary_for_runs()`, and full suite `PYTHONPATH= uv run python -m pytest -q` (`118 passed`, one FastAPI/httpx deprecation warning).
+
+---
+
+## [x] Task 15: Fix dashboard task-count semantics and replace AssistantBench stale string matching
+
+### Acceptance Criteria
+
+- [x] Entering `n` in the dashboard's former `Trials` field no longer repeats the first selected task `n` times.
+- [x] API requests from the legacy dashboard payload are normalized to run the first `n` tasks with one trial each.
+- [x] The dashboard no longer exposes a misleading visible `Trials` field.
+- [x] AssistantBench evaluation no longer relies on the two-year-old `expected.text_contains` string values from `AssistantBench/AssistantBench`.
+- [x] AssistantBench web-research tasks use a cheap OpenRouter LLM judge that evaluates answer correctness semantically instead of exact substring matching.
+- [x] Dashboard summaries reuse stored LLM-judge evaluations instead of re-judging already judged runs on every refresh.
+- [x] Regression tests cover legacy trials normalization, stale expected metadata, and LLM judge behavior.
+- [x] The full test suite passes.
+
+### Detailed Technical Instructions
+
+1. Trace the dashboard payload from `src/agent_efficiency_bench/web/index.html` / `app.js` through `RunRequest`, `expand_run_request()`, `execute_benchmark_combination()`, and `BenchmarkRunner.run_tasks()`.
+2. Add a regression proving old UI-shaped payloads with `limit=1, n_trials=n` become `limit=n, n_trials=1`.
+3. Remove the visible dashboard `Trials` input and present the existing limit as `Tasks per combination`.
+4. Add a cheap LLM judge evaluator for AssistantBench answers that receives the task instruction, submitted answer, and citations, and does not consume stale expected strings as ground truth.
+5. Route `AssistantBench/AssistantBench` tasks through the LLM judge evaluator.
+6. Keep deterministic `StructuredAnswerEvaluator` behavior for non-AssistantBench/custom structured tasks.
+7. Run targeted tests and the full suite.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/api.py`, `src/agent_efficiency_bench/web/index.html`, `src/agent_efficiency_bench/evaluators/llm_judge.py`, `src/agent_efficiency_bench/harnesses/assistantbench.py`, and related tests.
+
+Root cause for repeated tasks: the dashboard had both `limit` defaulting to `1` and a visible `n_trials` field labeled `Trials`. The backend passed `n_trials` straight to `BenchmarkRunner.run_tasks()`, whose documented behavior is to repeat each selected task. With the dashboard default `limit=1`, entering `n` in `Trials` therefore ran task 1 exactly `n` times. The API now normalizes legacy UI requests: if `n_trials > 1`, it is treated as the intended task count for API/dashboard runs, producing `limit=n` and `n_trials=1`. The visible UI field is now `Tasks per combination`; `n_trials` remains hidden at `1` for wire compatibility.
+
+Root cause for AssistantBench false confidence: the public AssistantBench files are stale, and exact `text_contains` expected strings like `Potash Markets - Clark Street` can now be factually wrong. AssistantBench is now evaluated by `LLMAnswerJudgeEvaluator`, which sends the task instruction, submitted answer, and citations to a cheap OpenRouter judge model (`AEB_LLM_JUDGE_MODEL`, default `openai/gpt-4.1-nano`). The judge prompt explicitly prefers current cited evidence over stale benchmark answer keys and returns JSON with `success`, `quality_score`, and `reason`. If citations are required and absent, evaluation fails before calling the judge. If `OPENROUTER_API_KEY` is unavailable, the score is marked unevaluated rather than falling back to stale deterministic strings. API summary re-evaluation also preserves stored LLM-judge evaluations so refreshing the dashboard does not repeatedly spend judge calls for already judged runs.
+
+Existing deterministic structured evaluation remains available for custom/non-AssistantBench structured tasks, including numeric checks, required domains, and exact citation extraction. Tests that specifically validate provider citation propagation were moved to a custom structured source so they continue testing that deterministic path without reintroducing stale AssistantBench string matching.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_api.py::test_api_treats_legacy_trials_field_as_task_count_for_ui_requests tests/test_llm_judge_evaluator.py tests/test_assistantbench_harness.py -q` (`7 passed`), `PYTHONPATH= uv run python -m pytest tests/test_api.py::test_api_chart_summary_does_not_rejudge_stored_llm_evaluations -q` (`1 passed`), and full suite `PYTHONPATH= uv run python -m pytest -q` (`121 passed`, one FastAPI/httpx deprecation warning).

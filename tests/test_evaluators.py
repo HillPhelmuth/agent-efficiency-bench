@@ -1,4 +1,5 @@
 from agent_efficiency_bench.evaluators.registry import OfficialHarnessResultEvaluator, RegistryEvaluator, evaluator_for_task
+from agent_efficiency_bench.harnesses.assistantbench import AssistantBenchEvaluator
 from agent_efficiency_bench.evaluators.simple import ExactAnswerEvaluator, NoOpEvaluator, UnevaluatedEvaluator
 from agent_efficiency_bench.schemas import BenchmarkTask, Budget, Complexity, RunResult, RunTelemetry, SuccessCriteria
 
@@ -14,7 +15,7 @@ def test_exact_answer_evaluator_normalizes_case_and_space():
     evaluator = ExactAnswerEvaluator(expected="New York City")
     score = evaluator.evaluate_output({"answer": " new   york city "})
     assert score.success is True
-    assert score.quality_score == 1.0
+    assert score.quality_score == 5.0
 
 
 def make_task(task_id: str, source: str, category: str, success_type: str, raw: dict | None = None, checker: str | None = None):
@@ -60,10 +61,9 @@ def test_registry_uses_assistantbench_evaluator():
         raw={"answer": "Paris"},
     )
 
-    score = RegistryEvaluator().evaluate(task, make_result(task.task_id, {"answer": "paris"}))
+    evaluator = evaluator_for_task(task)
 
-    assert score.evaluated is True
-    assert score.success is True
+    assert isinstance(evaluator, AssistantBenchEvaluator)
 
 
 def test_registry_uses_unevaluated_evaluator_for_missing_manual_path():

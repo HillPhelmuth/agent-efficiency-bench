@@ -20,6 +20,7 @@ from agent_efficiency_bench.harnesses.assistantbench import native_web_search_to
 from agent_efficiency_bench.io import read_jsonl
 from agent_efficiency_bench.reporting import summarize_by_dimensions
 from agent_efficiency_bench.runner import BenchmarkRunner, SuiteBudgetConfig
+from agent_efficiency_bench.scoring import coerce_persisted_quality_score
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunResult, RunTelemetry
 
 DEFAULT_TASKS_PATH = "data/tasks/public_efficiency_subset.jsonl"
@@ -272,6 +273,7 @@ def expand_run_request(request: RunRequest, *, job_id: str) -> list[BenchmarkCom
         product(request.models, request.scaffolds, request.categories, request.web_search),
         start=1,
     ):
+        limit, n_trials = _normalize_task_count_and_trials(request.limit, request.n_trials)
         safe_model = _safe_path_part(model)
         safe_category = _safe_path_part(category or "all")
         search_part = "web-search" if enable_web_search else "no-web-search"
@@ -287,13 +289,30 @@ def expand_run_request(request: RunRequest, *, job_id: str) -> list[BenchmarkCom
                 scaffold=scaffold,
                 category=category,
                 enable_web_search=enable_web_search,
-                limit=request.limit,
-                n_trials=request.n_trials,
+                limit=limit,
+                n_trials=n_trials,
                 max_completion_tokens=request.max_completion_tokens,
                 suite_budget=suite_budget,
             )
         )
     return combinations
+
+
+def _normalize_task_count_and_trials(limit: int | None, n_trials: int) -> tuple[int | None, int]:
+    """Treat the legacy UI Trials field as task count, not repeated trials.
+
+    The dashboard originally exposed both a default ``limit=1`` and a visible
+    ``n_trials`` field. Users reasonably interpreted that field as "run N
+    tasks", but the runner interpreted it as "repeat each selected task N
+    times", causing the first benchmark task to be run repeatedly. Preserve the
+    wire field for backwards compatibility while normalizing API/UI requests to
+    single-trial runs over the first N tasks.
+    """
+    if n_trials > 1:
+        if limit is None or limit <= 1:
+            return n_trials, 1
+        return limit, 1
+    return limit, 1
 
 
 def execute_benchmark_combination(combination: BenchmarkCombination) -> list[RunTelemetry]:
@@ -329,7 +348,7 @@ def chart_summary_for_runs(tasks_path: str, telemetry_paths: list[str], group_by
         if result_path.exists():
             runs.extend(_reevaluated_telemetry(result_path, tasks))
         else:
-            runs.extend(RunTelemetry.model_validate(row) for row in read_jsonl(telemetry_path))
+            runs.extend(_telemetry_from_row(row) for row in read_jsonl(telemetry_path))
     task_rows = {task_id: task.model_dump() for task_id, task in tasks.items()}
     summary = summarize_by_dimensions(task_rows, runs, _validated_group_by(group_by))
     return {"summary": summary, "chart_rows": _chart_rows(summary)}
@@ -347,6 +366,10 @@ def _reevaluated_telemetry(result_path: Path, tasks: dict[str, BenchmarkTask]) -
     for row in read_jsonl(result_path):
         result = RunResult.model_validate(row)
         task = tasks.get(result.telemetry.task_id)
+        if _has_stored_llm_evaluation(result):
+            result.telemetry = _coerced_telemetry(result.telemetry)
+            telemetry.append(result.telemetry)
+            continue
         if task is not None:
             score = evaluator.evaluate(task, result)
             result.telemetry.success = score.success
@@ -355,8 +378,29 @@ def _reevaluated_telemetry(result_path: Path, tasks: dict[str, BenchmarkTask]) -
                 result.telemetry.terminated_by = "not_evaluated"
             elif score.evaluated and result.telemetry.terminated_by == "not_evaluated":
                 result.telemetry.terminated_by = "success" if score.success else "evaluated"
-        telemetry.append(result.telemetry)
+        telemetry.append(_coerced_telemetry(result.telemetry))
     return telemetry
+
+
+def _telemetry_from_row(row: dict[str, Any]) -> RunTelemetry:
+    return _coerced_telemetry(RunTelemetry.model_validate(row))
+
+
+def _coerced_telemetry(telemetry: RunTelemetry) -> RunTelemetry:
+    telemetry.quality_score = coerce_persisted_quality_score(
+        telemetry.quality_score,
+        success=telemetry.success,
+        terminated_by=telemetry.terminated_by,
+    )
+    return telemetry
+
+
+def _has_stored_llm_evaluation(result: RunResult) -> bool:
+    evaluation = result.output.get("evaluation")
+    if not isinstance(evaluation, dict):
+        return False
+    details = evaluation.get("details")
+    return isinstance(details, dict) and details.get("judge") == "llm"
 
 
 def _validated_group_by(group_by: list[str]) -> list[str]:

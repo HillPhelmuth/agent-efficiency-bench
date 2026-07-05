@@ -166,7 +166,7 @@ tests/                                # unit tests
 
 A run that fails cheaply is not efficient. The primary reporting flow is:
 
-1. Evaluate outcome: `success` and/or `quality_score`.
+1. Evaluate outcome: `success` and a 1-5 `quality_score`.
 2. Measure resources: tokens, time, LLM calls, tool calls, retries, USD.
 3. Report success-gated efficiency: cost per success, quality per dollar, quality per minute, quality per 1K tokens.
 

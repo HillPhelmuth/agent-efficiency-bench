@@ -74,5 +74,5 @@ def test_parse_terminal_bench_result_reads_nested_summary(tmp_path):
     parsed = parse_terminal_bench_result(result_path)
 
     assert parsed["success"] is True
-    assert parsed["quality_score"] == 0.75
+    assert parsed["quality_score"] == 4.0
     assert parsed["status"] == "resolved"

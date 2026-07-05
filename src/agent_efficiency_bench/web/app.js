@@ -453,7 +453,7 @@
       { key: 'group', label: 'Group' },
       { key: 'total_runs', label: 'Runs', numeric: true, fmt: (v) => formatNumber(v, { decimals: 0 }) },
       { key: 'success_rate', label: 'Success', numeric: true, fmt: (v) => formatPercent(v) },
-      { key: 'mean_quality', label: 'Quality', numeric: true, fmt: (v) => formatNumber(v, { decimals: 2 }) },
+      { key: 'mean_quality', label: 'Quality (1-5)', numeric: true, fmt: (v) => formatNumber(v, { decimals: 2 }) },
       { key: 'total_cost', label: 'Cost', numeric: true, fmt: (v) => formatCurrency(v) },
       { key: 'p50_latency_seconds', label: 'p50 (s)', numeric: true, fmt: (v) => formatNumber(v, { decimals: 1 }) },
       { key: 'total_tokens', label: 'Tokens', numeric: true, fmt: (v) => formatNumber(v, { decimals: 0, compact: true }) },

@@ -69,7 +69,7 @@ def test_run_tau2_task_execute_runs_configured_runner(monkeypatch, tmp_path):
 
     assert result["exit_code"] == 0
     assert result["parsed_result"]["success"] is True
-    assert result["parsed_result"]["quality_score"] == 1.0
+    assert result["parsed_result"]["quality_score"] == 5.0
 
 
 def test_parse_tau2_result_uses_action_ratio_when_score_missing(tmp_path):
@@ -79,4 +79,4 @@ def test_parse_tau2_result_uses_action_ratio_when_score_missing(tmp_path):
     parsed = parse_tau2_result(result_path)
 
     assert parsed["success"] is False
-    assert parsed["quality_score"] == 0.5
+    assert parsed["quality_score"] == 3.0

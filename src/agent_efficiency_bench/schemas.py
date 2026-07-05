@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from agent_efficiency_bench.scoring import LIKERT_SCORE_MAX, UNEVALUATED_QUALITY_SCORE
+
 
 SourceType = Literal["huggingface", "github", "custom"]
 Horizon = Literal["atomic", "short", "medium", "long", "very_long"]
@@ -56,7 +58,7 @@ class Budget(BaseModel):
 
 class SuccessCriteria(BaseModel):
     type: str
-    minimum_quality_score: float = 1.0
+    minimum_quality_score: float = LIKERT_SCORE_MAX
     checker: str | None = None
     notes: str | None = None
 
@@ -100,7 +102,7 @@ class RunTelemetry(BaseModel):
     trial_index: int | None = None
     server_tools_configured: list[str] = Field(default_factory=list)
     success: bool
-    quality_score: float = Field(ge=0.0, le=1.0)
+    quality_score: float = Field(ge=UNEVALUATED_QUALITY_SCORE, le=LIKERT_SCORE_MAX)
     wall_clock_seconds: float = Field(ge=0.0)
     llm_time_seconds: float = Field(default=0.0, ge=0.0)
     tool_time_seconds: float = Field(default=0.0, ge=0.0)

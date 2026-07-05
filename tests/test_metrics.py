@@ -9,7 +9,7 @@ def test_score_run_penalizes_cost_time_and_tokens():
         agent="agent-a",
         model="model-x",
         success=True,
-        quality_score=1.0,
+        quality_score=5.0,
         wall_clock_seconds=60,
         input_tokens=1000,
         output_tokens=500,
@@ -32,8 +32,8 @@ def test_score_run_penalizes_cost_time_and_tokens():
 
 def test_aggregate_runs_reports_cost_per_success():
     runs = [
-        RunTelemetry(run_id="r1", task_id="t1", agent="a", model="m", success=True, quality_score=1, wall_clock_seconds=10, input_tokens=100, output_tokens=10, estimated_usd=0.10),
-        RunTelemetry(run_id="r2", task_id="t2", agent="a", model="m", success=False, quality_score=0, wall_clock_seconds=20, input_tokens=200, output_tokens=20, estimated_usd=0.20),
+        RunTelemetry(run_id="r1", task_id="t1", agent="a", model="m", success=True, quality_score=5, wall_clock_seconds=10, input_tokens=100, output_tokens=10, estimated_usd=0.10),
+        RunTelemetry(run_id="r2", task_id="t2", agent="a", model="m", success=False, quality_score=1, wall_clock_seconds=20, input_tokens=200, output_tokens=20, estimated_usd=0.20),
     ]
 
     summary = aggregate_runs(runs)

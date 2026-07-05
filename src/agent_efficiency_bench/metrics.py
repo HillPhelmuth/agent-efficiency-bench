@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from agent_efficiency_bench.schemas import RunTelemetry
+from agent_efficiency_bench.scoring import UNEVALUATED_QUALITY_SCORE
 
 
 class RunEfficiency(BaseModel):
@@ -38,9 +39,9 @@ def score_run(run: RunTelemetry) -> RunEfficiency:
     """Compute success-gated efficiency for one run.
 
     Failed runs receive an outcome score of 0 even if they are cheap. Partial
-    quality can be represented by setting success=True and quality_score < 1.
+    quality can be represented by setting success=True and quality_score < 5.
     """
-    outcome = run.quality_score if run.success else 0.0
+    outcome = run.quality_score if run.success else UNEVALUATED_QUALITY_SCORE
     return RunEfficiency(
         run_id=run.run_id,
         task_id=run.task_id,
@@ -60,7 +61,7 @@ def aggregate_runs(runs: list[RunTelemetry]) -> AggregateEfficiency:
     total_cost = round(sum(run.estimated_usd for run in runs), 10)
     total_tokens = sum(run.total_tokens for run in runs)
     total_wall_clock = sum(run.wall_clock_seconds for run in runs)
-    mean_quality = sum(run.quality_score for run in runs) / total_runs if total_runs else 0.0
+    mean_quality = sum(run.quality_score for run in runs) / total_runs if total_runs else UNEVALUATED_QUALITY_SCORE
 
     return AggregateEfficiency(
         total_runs=total_runs,

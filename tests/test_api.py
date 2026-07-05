@@ -65,6 +65,26 @@ def test_api_dry_run_expands_requested_benchmark_combinations(tmp_path):
     assert {combo["enable_web_search"] for combo in payload["combinations"]} == {False, True}
 
 
+def test_api_treats_legacy_trials_field_as_task_count_for_ui_requests(tmp_path):
+    from agent_efficiency_bench.api import RunRequest, expand_run_request
+
+    tasks = tmp_path / "tasks.jsonl"
+    _write_task_file(tasks)
+    request = RunRequest(
+        tasks_path=str(tasks),
+        output_root=str(tmp_path / "runs"),
+        models=["model-a"],
+        categories=["web_research"],
+        limit=1,
+        n_trials=2,
+    )
+
+    [combo] = expand_run_request(request, job_id="job-test")
+
+    assert combo.limit == 2
+    assert combo.n_trials == 1
+
+
 def test_api_run_status_and_results_use_existing_runner_path(tmp_path, monkeypatch):
     from agent_efficiency_bench import api
 
@@ -83,7 +103,7 @@ def test_api_run_status_and_results_use_existing_runner_path(tmp_path, monkeypat
                 scaffold="web-search-answer" if combination.enable_web_search else combination.scaffold,
                 server_tools_configured=["openrouter:web_search"] if combination.enable_web_search else [],
                 success=True,
-                quality_score=1.0,
+                quality_score=5.0,
                 wall_clock_seconds=2.0,
                 input_tokens=10,
                 output_tokens=5,
@@ -158,7 +178,7 @@ def test_api_results_can_read_existing_telemetry_file_for_charts(tmp_path):
             "group": "category=web_research | model=model-a",
             "total_runs": 1,
             "success_rate": 1.0,
-            "mean_quality": 1.0,
+            "mean_quality": 5.0,
             "total_cost": 0.01,
             "p50_latency_seconds": 2.0,
             "total_tokens": 15,
@@ -174,8 +194,8 @@ def test_api_chart_summary_reevaluates_run_results_when_available(tmp_path):
     telemetry = tmp_path / "run_telemetry.jsonl"
     results = tmp_path / "run_results.jsonl"
     task_row = {
-        "task_id": "assistantbench__url",
-        "source": "AssistantBench/AssistantBench",
+        "task_id": "custom__url",
+        "source": "custom-web-research",
         "source_type": "huggingface",
         "category": "web_research",
         "instruction": "Find the URL.",
@@ -186,7 +206,7 @@ def test_api_chart_summary_reevaluates_run_results_when_available(tmp_path):
     }
     stale_telemetry = {
         "run_id": "r1",
-        "task_id": "assistantbench__url",
+        "task_id": "custom__url",
         "agent": "openrouter-answer",
         "model": "model-a",
         "scaffold": "answer-only",
@@ -217,7 +237,62 @@ def test_api_chart_summary_reevaluates_run_results_when_available(tmp_path):
     row = payload["summary"]["category=web_research | model=model-a"]
     assert row["successful_runs"] == 1
     assert row["success_rate"] == 1.0
-    assert row["mean_quality"] == 1.0
+    assert row["mean_quality"] == 5.0
+
+
+def test_api_chart_summary_does_not_rejudge_stored_llm_evaluations(tmp_path):
+    from agent_efficiency_bench.api import chart_summary_for_runs
+
+    tasks = tmp_path / "tasks.jsonl"
+    telemetry = tmp_path / "run_telemetry.jsonl"
+    results = tmp_path / "run_results.jsonl"
+    task_row = {
+        "task_id": "assistantbench__judged",
+        "source": "AssistantBench/AssistantBench",
+        "source_type": "huggingface",
+        "category": "web_research",
+        "instruction": "Q?",
+        "environment": {"type": "web"},
+        "complexity": {"horizon": "short", "requires_external_search": True},
+        "success_criteria": {"type": "structured_answer"},
+        "raw": {"expected": {"text_contains": ["stale"], "requires_citation": True}},
+    }
+    judged_telemetry = {
+        "run_id": "r1",
+        "task_id": "assistantbench__judged",
+        "agent": "openrouter-answer",
+        "model": "model-a",
+        "scaffold": "answer-only",
+        "success": True,
+        "quality_score": 0.8,
+        "wall_clock_seconds": 2.0,
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "estimated_usd": 0.01,
+        "terminated_by": "success",
+    }
+    tasks.write_text(json.dumps(task_row) + "\n", encoding="utf-8")
+    telemetry.write_text(json.dumps(judged_telemetry) + "\n", encoding="utf-8")
+    results.write_text(
+        json.dumps(
+            {
+                "telemetry": judged_telemetry,
+                "output": {
+                    "answer": "A previously judged answer.",
+                    "evaluation": {"reason": "fake judge", "details": {"judge": "llm"}},
+                },
+                "trace_path": "trace.jsonl",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = chart_summary_for_runs(tasks_path=str(tasks), telemetry_paths=[str(telemetry)], group_by=["category", "model"])
+
+    row = payload["summary"]["category=web_research | model=model-a"]
+    assert row["successful_runs"] == 1
+    assert row["mean_quality"] == 4.2
 
 
 def test_web_ui_is_served_from_root(tmp_path):

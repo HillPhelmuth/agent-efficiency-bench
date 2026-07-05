@@ -54,7 +54,7 @@ def test_run_result_wraps_existing_telemetry():
         agent="a",
         model="m",
         success=True,
-        quality_score=1.0,
+        quality_score=5.0,
         wall_clock_seconds=1.0,
         input_tokens=10,
         output_tokens=5,

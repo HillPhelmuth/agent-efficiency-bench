@@ -41,7 +41,7 @@ class FakeHarnessAgent(FakeAgent):
 
 class FakeEvaluator:
     def evaluate(self, task, result):
-        return EvaluationScore(success=True, quality_score=1.0, reason="ok")
+        return EvaluationScore(success=True, quality_score=5.0, reason="ok")
 
 
 class TaskOutcomeEvaluator:
@@ -50,7 +50,7 @@ class TaskOutcomeEvaluator:
 
     def evaluate(self, task, result):
         success = self.outcomes[task.task_id]
-        return EvaluationScore(success=success, quality_score=1.0 if success else 0.0, reason="ok")
+        return EvaluationScore(success=success, quality_score=5.0 if success else 1.0, reason="ok")
 
 
 def make_task(task_id: str = "t1"):
@@ -71,7 +71,7 @@ def test_runner_updates_telemetry_with_evaluation(tmp_path):
     runner = BenchmarkRunner(agent=FakeAgent(), evaluator=FakeEvaluator(), output_dir=tmp_path)
     result = runner.run_task(make_task())
     assert result.telemetry.success is True
-    assert result.telemetry.quality_score == 1.0
+    assert result.telemetry.quality_score == 5.0
     assert (tmp_path / "run_results.jsonl").exists()
     assert (tmp_path / "run_telemetry.jsonl").exists()
 

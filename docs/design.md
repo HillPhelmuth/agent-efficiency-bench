@@ -38,7 +38,7 @@ Run status terms:
 - `evaluated`: the harness produced a score through a local evaluator or parsed official harness result.
 - `unevaluated`: the harness produced telemetry, but no scoring path exists yet for benchmark interpretation.
 - `successful`: an evaluated run satisfied its success criteria.
-- `failed`: the run did not satisfy its success criteria, including cases where an evaluator returned a zero-quality outcome.
+- `failed`: the run did not satisfy its success criteria, including cases where an evaluator returned the minimum Likert quality outcome.
 - `budget-exceeded`: execution stopped because a configured budget limit was reached before another step or task could safely begin.
 
 ## Benchmark tiers

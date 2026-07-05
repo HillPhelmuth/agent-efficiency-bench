@@ -38,6 +38,7 @@ from agent_efficiency_bench.reporting import (
     write_markdown_report,
 )
 from agent_efficiency_bench.runner import BenchmarkRunner, SuiteBudgetConfig
+from agent_efficiency_bench.scoring import coerce_persisted_quality_score
 from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunTelemetry
 from agent_efficiency_bench.sources import load_sources_from_config
 from agent_efficiency_bench.task_audit import audit_tasks as audit_task_rows, format_audit_markdown
@@ -83,7 +84,7 @@ def catalog(path: str) -> None:
 @app.command("score-runs")
 def score_runs(path: str) -> None:
     """Summarize run telemetry JSONL using success-gated efficiency metrics."""
-    runs = [RunTelemetry.model_validate(row) for row in read_jsonl(path)]
+    runs = [_telemetry_from_row(row) for row in read_jsonl(path)]
     summary = aggregate_runs(runs)
     console.print_json(summary.model_dump_json(exclude_none=True))
 
@@ -352,7 +353,7 @@ def report(
 ) -> None:
     """Generate an efficiency report grouped by selected dimensions."""
     task_rows = [BenchmarkTask.model_validate(row) for row in read_jsonl(tasks)]
-    run_rows = [RunTelemetry.model_validate(row) for row in read_jsonl(runs)]
+    run_rows = [_telemetry_from_row(row) for row in read_jsonl(runs)]
     task_lookup = {task.task_id: task.model_dump() for task in task_rows}
     dimensions = [part.strip() for part in group_by.split(",") if part.strip()]
     if dimensions == ["category"] and manifest is None:
@@ -406,6 +407,16 @@ def _manifest_lookup(manifest: str | None, runs: list[RunTelemetry]) -> dict[str
         return {}
     data = json.loads(Path(manifest).read_text(encoding="utf-8"))
     return {run.run_id: data for run in runs}
+
+
+def _telemetry_from_row(row: dict) -> RunTelemetry:
+    telemetry = RunTelemetry.model_validate(row)
+    telemetry.quality_score = coerce_persisted_quality_score(
+        telemetry.quality_score,
+        success=telemetry.success,
+        terminated_by=telemetry.terminated_by,
+    )
+    return telemetry
 
 
 if __name__ == "__main__":

@@ -40,6 +40,14 @@
     return '$' + Number(value).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
+  function formatCurrencyTick(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '—';
+    const abs = Math.abs(num);
+    const decimals = abs > 0 && abs < 0.01 ? 4 : 2;
+    return '$' + num.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
   function formatPercent(value) {
     if (value == null || !Number.isFinite(Number(value))) return '—';
     return (Number(value) * 100).toFixed(1) + '%';
@@ -86,7 +94,10 @@
     const fd = new FormData(form);
     const categories = splitCSV(fd.get('categories'));
     const limit = Number(fd.get('limit'));
-    return {
+    const tau2MaxSteps = Number(fd.get('tau2_max_steps'));
+    const tau2Seed = Number(fd.get('tau2_seed'));
+    const tau2Trials = Number(fd.get('tau2_num_trials') || 1);
+    const payload = {
       tasks_path: fd.get('tasks_path'),
       output_root: fd.get('output_root'),
       models: splitCSV(fd.get('models')),
@@ -95,10 +106,19 @@
       web_search: checkedValues('web_search').map((v) => v === 'true'),
       limit: Number.isFinite(limit) && limit > 0 ? limit : null,
       n_trials: Number(fd.get('n_trials') || 1),
-      max_completion_tokens: Number(fd.get('max_completion_tokens') || 256),
+      max_completion_tokens: Number(fd.get('max_completion_tokens') || 2048),
       group_by: splitCSV(fd.get('group_by') || 'category,model,scaffold'),
       dry_run: Boolean(fd.get('dry_run')),
     };
+    if (payload.scaffolds.includes('tau2-official')) {
+      payload.tau2_agent = fd.get('tau2_agent') || 'llm_agent';
+      payload.tau2_user = fd.get('tau2_user') || 'user_simulator';
+      payload.tau2_user_model = fd.get('tau2_user_model') || null;
+      payload.tau2_num_trials = Number.isFinite(tau2Trials) && tau2Trials > 0 ? tau2Trials : 1;
+      payload.tau2_max_steps = Number.isFinite(tau2MaxSteps) && tau2MaxSteps > 0 ? tau2MaxSteps : null;
+      payload.tau2_seed = Number.isFinite(tau2Seed) ? tau2Seed : null;
+    }
+    return payload;
   }
 
   function updateCombinationCount() {
@@ -111,6 +131,18 @@
     const el = $('#combination-count');
     el.textContent = `${count} combination${count !== 1 ? 's' : ''}`;
     el.hidden = false;
+  }
+
+  function syncTau2Defaults() {
+    const tau2Checked = Array.from($$('input[name="scaffolds"]'))
+      .some((el) => el.value === 'tau2-official' && el.checked);
+    if (!tau2Checked) return;
+    const categoryInput = $('[name="categories"]');
+    if (!categoryInput) return;
+    const value = categoryInput.value.trim();
+    if (!value || value === 'web_research') {
+      categoryInput.value = 'tool_workflow';
+    }
   }
 
   /* --- API calls --- */
@@ -384,6 +416,54 @@
     };
   }
 
+  function parseGroupLabel(label) {
+    return String(label || '')
+      .split(' | ')
+      .map((part) => {
+        const eq = part.indexOf('=');
+        if (eq < 1) return null;
+        return { key: part.slice(0, eq), value: part.slice(eq + 1) };
+      })
+      .filter(Boolean);
+  }
+
+  function variableGroupKeys(rows) {
+    const valuesByKey = new Map();
+    rows.forEach((row) => {
+      parseGroupLabel(row.group || '—').forEach(({ key, value }) => {
+        if (!valuesByKey.has(key)) valuesByKey.set(key, new Set());
+        valuesByKey.get(key).add(value);
+      });
+    });
+    return new Set(Array.from(valuesByKey.entries())
+      .filter(([, values]) => values.size > 1)
+      .map(([key]) => key));
+  }
+
+  function shortenLabelValue(value, max = 24) {
+    const text = String(value || '—');
+    if (text.length <= max) return text;
+    if (text.includes('/')) {
+      const parts = text.split('/');
+      const tail = parts[parts.length - 1];
+      if (tail.length <= max) return tail;
+    }
+    return text.slice(0, Math.max(0, max - 1)) + '…';
+  }
+
+  function compactChartLabel(fullLabel, variableKeys) {
+    const entries = parseGroupLabel(fullLabel);
+    if (!entries.length) return shortenLabelValue(fullLabel);
+
+    const visible = entries.filter(({ key }) => variableKeys.has(key));
+    const parts = (visible.length ? visible : entries).map(({ key, value }) => {
+      const shortValue = shortenLabelValue(value, key === 'model' ? 28 : 24);
+      return visible.length === 1 && key === 'category' ? shortValue : `${key}=${shortValue}`;
+    });
+
+    return parts.length === 1 ? parts[0] : parts;
+  }
+
   function renderCharts(rows) {
     drawBar('success-chart', rows, 'success_rate', 'Success rate', (v) => v, 'percent');
     drawBar('cost-chart', rows, 'total_cost', 'Total cost (USD)', (v) => v, 'currency');
@@ -397,13 +477,15 @@
     if (charts[canvasId]) charts[canvasId].destroy();
 
     const theme = chartTheme();
-    const labels = rows.map((r) => r.group || '—');
+    const fullLabels = rows.map((r) => r.group || '—');
+    const variableKeys = variableGroupKeys(rows);
+    const labels = fullLabels.map((fullLabel) => compactChartLabel(fullLabel, variableKeys));
     const data = rows.map((r) => Number(r[metric] ?? 0));
 
     const tickCallback = fmt === 'percent'
       ? (v) => (v * 100).toFixed(0) + '%'
       : fmt === 'currency'
-        ? (v) => '$' + v.toFixed(2)
+        ? formatCurrencyTick
         : undefined;
 
     charts[canvasId] = new Chart(canvas, {
@@ -424,12 +506,15 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            callbacks: tickCallback ? { label: (ctx) => `${label}: ${tickCallback(ctx.parsed.y)}` } : {},
+            callbacks: {
+              title: (items) => fullLabels[items[0]?.dataIndex] || '',
+              ...(tickCallback ? { label: (ctx) => `${label}: ${tickCallback(ctx.parsed.y)}` } : {}),
+            },
           },
         },
         scales: {
           x: {
-            ticks: { color: theme.text, maxRotation: 45, minRotation: 0, autoSkip: false },
+            ticks: { color: theme.text, maxRotation: 0, minRotation: 0, autoSkip: rows.length > 8 },
             grid: { display: false },
           },
           y: {
@@ -491,6 +576,12 @@
     $$('#run-form input').forEach((el) => {
       el.addEventListener('input', updateCombinationCount);
       el.addEventListener('change', updateCombinationCount);
+    });
+    $$('input[name="scaffolds"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        syncTau2Defaults();
+        updateCombinationCount();
+      });
     });
 
     // Refresh catalog when tasks_path changes (debounced)

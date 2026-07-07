@@ -470,3 +470,52 @@ def test_run_tau2_official_cli_execute_flag_passes_runner_module(tmp_path, monke
     assert captured["dry_run"] is False
     assert captured["execute"] is True
     assert captured["runner_module"] == "tau2.runner"
+
+
+def test_run_tau2_official_cli_passes_agent_and_evaluator_options(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_run_tau2_task(**kwargs):
+        captured.update(kwargs)
+        return {"dry_run": kwargs["dry_run"], "execute": kwargs["execute"], "command": ["tau2", "run"]}
+
+    monkeypatch.setattr(cli, "run_tau2_task", fake_run_tau2_task)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-tau2-official",
+            "--task-id",
+            "tau2_bench_retail__55",
+            "--model",
+            "openai/gpt-5.4-nano",
+            "--output-dir",
+            str(tmp_path / "tau2"),
+            "--agent",
+            "custom_agent",
+            "--user",
+            "custom_user",
+            "--user-model",
+            "openai/gpt-5.4-mini",
+            "--num-trials",
+            "2",
+            "--max-steps",
+            "25",
+            "--seed",
+            "123",
+            "--tau2-save-to",
+            "aeb-tau2-smoke",
+            "--result-path",
+            str(tmp_path / "tau2" / "results.json"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["agent"] == "custom_agent"
+    assert captured["user"] == "custom_user"
+    assert captured["user_model"] == "openai/gpt-5.4-mini"
+    assert captured["num_trials"] == 2
+    assert captured["max_steps"] == 25
+    assert captured["seed"] == 123
+    assert captured["tau2_save_to"] == "aeb-tau2-smoke"
+    assert captured["result_path"].endswith("results.json")

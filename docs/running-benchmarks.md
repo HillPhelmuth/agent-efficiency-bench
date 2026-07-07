@@ -259,14 +259,17 @@ PYTHONPATH= uv run aeb run-tau2-official \
   --output-dir runs/tau2-official
 ```
 
-tau2 official workflow execute path. Because this repository does not pin the upstream tau2 runner command shape, `--execute` also requires an explicit `--runner-module` that knows how to run tau2 tasks in your environment:
+tau2 official workflow execute path. This uses the upstream `tau2 run` CLI, which runs both the configured agent and the tau2 evaluator. `--execute` is required because this may spend model tokens through the agent and user simulator:
 
 ```bash
 PYTHONPATH= uv run aeb run-tau2-official \
   --task-id tau2_bench_retail__55 \
   --model openai/gpt-5.4-nano \
+  --user-model openai/gpt-5.4-mini \
+  --num-trials 1 \
+  --max-steps 50 \
   --output-dir runs/tau2-official \
-  --runner-module tau2.runner \
+  --result-path runs/tau2-official/results.json \
   --execute
 ```
 
@@ -276,7 +279,7 @@ These commands only print official harness invocations. They do not execute Dock
 
 `run-swe-bench-official` is separate from the preview command. By default it performs a prerequisite-aware dry run and prints the planned evaluation command, report path, and suite-budget metadata. Only `--execute` will attempt to run the official SWE-bench harness.
 
-`run-tau2-official` is separate from generic local answer/tool-loop runs. Its dry-run path validates normalized tau2 task mapping and records that the upstream runner command is unresolved unless you supply `--runner-module`. Only `--execute` with a configured runner module will attempt to run a tau2 workflow.
+`run-tau2-official` is separate from generic local answer/tool-loop runs. Its dry-run path validates normalized tau2 task mapping, checks for the `tau2` CLI, and prints the planned `tau2 run` command including agent, user simulator, model, trial, and task-id options. Only `--execute` will attempt to run a tau2 workflow, and parsed tau2 `results.json` reward metadata can be attached as an official harness result.
 
 ## Safety notes
 
@@ -287,5 +290,5 @@ These commands only print official harness invocations. They do not execute Dock
 - Full Terminal-Bench/SWE-bench runs require external official harness setup.
 - `run-terminal-bench-official --execute` can invoke Docker/Harbor and spend real model tokens, so keep the default dry-run path until prerequisites and task mapping are confirmed.
 - `run-swe-bench-official --execute` can launch the official SWE-bench harness, so keep the default dry-run path until predictions, report paths, and prerequisites are confirmed.
-- `run-tau2-official --execute` is intentionally guarded and requires an explicit runner module because this repository does not yet pin a single upstream tau2 execution command.
+- `run-tau2-official --execute` can spend real model tokens through both the tau2 agent LLM and user-simulator LLM, so keep the default dry-run path until the `tau2` CLI, API keys, task ids, and result path are confirmed.
 - Always start with `--limit 1` and inspect trace files before scaling up.

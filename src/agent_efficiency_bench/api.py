@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from collections import Counter
 from itertools import product
+import json
 import threading
 import traceback
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Literal
@@ -17,7 +19,8 @@ from agent_efficiency_bench.agents.openrouter_answer import OpenRouterAnswerAgen
 from agent_efficiency_bench.agents.openrouter_tool_loop import OpenRouterToolLoopAgent
 from agent_efficiency_bench.evaluators.registry import RegistryEvaluator
 from agent_efficiency_bench.harnesses.assistantbench import native_web_search_tool
-from agent_efficiency_bench.io import read_jsonl
+from agent_efficiency_bench.harnesses.tau2_bench import run_tau2_task
+from agent_efficiency_bench.io import read_jsonl, write_jsonl
 from agent_efficiency_bench.reporting import summarize_by_dimensions
 from agent_efficiency_bench.runner import BenchmarkRunner, SuiteBudgetConfig
 from agent_efficiency_bench.scoring import coerce_persisted_quality_score
@@ -25,7 +28,7 @@ from agent_efficiency_bench.schemas import BenchmarkTask, ModelConfig, RunResult
 
 DEFAULT_TASKS_PATH = "data/tasks/public_efficiency_subset.jsonl"
 DEFAULT_OUTPUT_ROOT = "runs/api"
-SUPPORTED_SCAFFOLDS = ["answer-only", "react-tool-loop"]
+SUPPORTED_SCAFFOLDS = ["answer-only", "react-tool-loop", "tau2-official"]
 SUPPORTED_GROUP_BY = [
     "category",
     "source",
@@ -52,7 +55,7 @@ class RunRequest(BaseModel):
     tasks_path: str = DEFAULT_TASKS_PATH
     output_root: str = DEFAULT_OUTPUT_ROOT
     models: list[str] = Field(min_length=1)
-    scaffolds: list[Literal["answer-only", "react-tool-loop"]] = Field(default_factory=lambda: ["answer-only"])
+    scaffolds: list[Literal["answer-only", "react-tool-loop", "tau2-official"]] = Field(default_factory=lambda: ["answer-only"])
     categories: list[str | None] = Field(default_factory=lambda: [None])
     web_search: list[bool] = Field(default_factory=lambda: [False])
     limit: int | None = Field(default=None, ge=1)
@@ -64,6 +67,12 @@ class RunRequest(BaseModel):
     max_suite_failures: int | None = Field(default=None, ge=1)
     group_by: list[str] = Field(default_factory=lambda: ["category", "model", "scaffold"])
     dry_run: bool = False
+    tau2_agent: str = "llm_agent"
+    tau2_user: str = "user_simulator"
+    tau2_user_model: str | None = None
+    tau2_num_trials: int = Field(default=1, ge=1)
+    tau2_max_steps: int | None = Field(default=None, ge=1)
+    tau2_seed: int | None = None
 
 
 class SuiteBudgetConfigModel(BaseModel):
@@ -88,13 +97,19 @@ class BenchmarkCombination(BaseModel):
     tasks_path: str
     output_dir: str
     model: str
-    scaffold: Literal["answer-only", "react-tool-loop"]
+    scaffold: Literal["answer-only", "react-tool-loop", "tau2-official"]
     category: str | None = None
     enable_web_search: bool = False
     limit: int | None = None
     n_trials: int = 1
     max_completion_tokens: int = 2048
     suite_budget: SuiteBudgetConfigModel = Field(default_factory=SuiteBudgetConfigModel)
+    tau2_agent: str = "llm_agent"
+    tau2_user: str = "user_simulator"
+    tau2_user_model: str | None = None
+    tau2_num_trials: int = 1
+    tau2_max_steps: int | None = None
+    tau2_seed: int | None = None
 
 
 class JobRecord(BaseModel):
@@ -293,6 +308,12 @@ def expand_run_request(request: RunRequest, *, job_id: str) -> list[BenchmarkCom
                 n_trials=n_trials,
                 max_completion_tokens=request.max_completion_tokens,
                 suite_budget=suite_budget,
+                tau2_agent=request.tau2_agent,
+                tau2_user=request.tau2_user,
+                tau2_user_model=request.tau2_user_model,
+                tau2_num_trials=request.tau2_num_trials,
+                tau2_max_steps=request.tau2_max_steps,
+                tau2_seed=request.tau2_seed,
             )
         )
     return combinations
@@ -320,6 +341,8 @@ def execute_benchmark_combination(combination: BenchmarkCombination) -> list[Run
     selected = [task for task in tasks if combination.category is None or task.category == combination.category]
     if combination.limit is not None:
         selected = selected[: combination.limit]
+    if combination.scaffold == "tau2-official":
+        return execute_tau2_official_combination(combination, selected)
     tools = [native_web_search_tool()] if combination.enable_web_search else None
     config = ModelConfig(model=combination.model, max_completion_tokens=combination.max_completion_tokens, tools=tools)
     if combination.scaffold == "answer-only":
@@ -337,6 +360,85 @@ def execute_benchmark_combination(combination: BenchmarkCombination) -> list[Run
         suite_budget=combination.suite_budget.to_runner_config(),
     )
     results = runner.run_tasks(selected, n_trials=combination.n_trials)
+    return [result.telemetry for result in results]
+
+
+def execute_tau2_official_combination(combination: BenchmarkCombination, tasks: list[BenchmarkTask]) -> list[RunTelemetry]:
+    output_dir = Path(combination.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results: list[RunResult] = []
+    evaluator = RegistryEvaluator()
+    for index, task in enumerate(tasks):
+        if task.source != "sierra-research/tau2-bench" and task.success_criteria.type != "tau2_actions":
+            continue
+        artifact_dir = output_dir / task.task_id
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        trace_path = artifact_dir / "trace.jsonl"
+        started = time.perf_counter()
+        harness_payload = run_tau2_task(
+            task_id=task.task_id,
+            model=combination.model,
+            output_dir=str(artifact_dir),
+            agent=combination.tau2_agent,
+            user=combination.tau2_user,
+            user_model=combination.tau2_user_model,
+            num_trials=combination.tau2_num_trials,
+            max_steps=combination.tau2_max_steps,
+            seed=combination.tau2_seed,
+            dry_run=False,
+            execute=True,
+            result_path=artifact_dir / "results.json",
+            suite_budget=combination.suite_budget.model_dump(exclude_none=True),
+        )
+        parsed = harness_payload.get("parsed_result") if isinstance(harness_payload.get("parsed_result"), dict) else None
+        harness_result = parsed or {
+            "success": False,
+            "quality_score": 0.0,
+            "reason": "tau2 executed but no results.json was found for parsing",
+            "details": {"harness": "tau2-bench", "exit_code": harness_payload.get("exit_code")},
+            "raw": harness_payload,
+        }
+        harness_details = harness_result.get("details") if isinstance(harness_result.get("details"), dict) else {}
+        telemetry = RunTelemetry(
+            run_id=f"{combination.run_id_prefix}-{index:03d}-{task.task_id}",
+            task_id=task.task_id,
+            agent="tau2-official",
+            model=combination.model,
+            scaffold="tau2-official",
+            success=bool(harness_result.get("success")),
+            quality_score=float(harness_result.get("quality_score") or 0.0),
+            wall_clock_seconds=time.perf_counter() - started,
+            input_tokens=0,
+            output_tokens=0,
+            estimated_usd=float(harness_details.get("total_cost") or harness_details.get("agent_cost") or 0.0),
+            num_tool_calls=int(harness_result.get("total_actions") or 0),
+            terminated_by="success" if harness_result.get("success") else "evaluated",
+        )
+        result = RunResult(
+            telemetry=telemetry,
+            output={"harness_result": harness_result, "tau2_payload": harness_payload},
+            trace_path=str(trace_path),
+            artifact_dir=str(artifact_dir),
+        )
+        score = evaluator.evaluate(task, result)
+        result.telemetry.success = score.success
+        result.telemetry.quality_score = score.quality_score
+        result.telemetry.terminated_by = "success" if score.success else "evaluated"
+        result.output["evaluation"] = score.model_dump(exclude_none=True)
+        trace_path.write_text(
+            "\n".join(
+                [
+                    json.dumps({"event": "task_start", "task_id": task.task_id, "run_id": result.telemetry.run_id}),
+                    json.dumps({"event": "tau2_run", "task_id": task.task_id, "run_id": result.telemetry.run_id, "data": harness_payload}),
+                    json.dumps({"event": "task_end", "task_id": task.task_id, "run_id": result.telemetry.run_id, "data": result.output["evaluation"]}),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        results.append(result)
+    write_jsonl(output_dir / "run_results.jsonl", results)
+    write_jsonl(output_dir / "run_telemetry.jsonl", [result.telemetry for result in results])
     return [result.telemetry for result in results]
 
 

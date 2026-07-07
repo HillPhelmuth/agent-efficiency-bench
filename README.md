@@ -48,7 +48,7 @@ Current local scoring status:
 - `web_research` / AssistantBench tasks are evaluated through structured-answer or exact-answer logic when expected metadata is present.
 - `software_engineering` / SWE-bench Lite tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached.
 - `terminal_work` / Terminal-Bench tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached.
-- `tool_workflow` / tau2-bench tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached. A tau2 official adapter now supports task-id mapping and dry-run planning, but execute still requires an explicit external runner module because the upstream command shape is not pinned in this repository.
+- `tool_workflow` / tau2-bench tasks are treated as unevaluated in generic local runs unless official harness result metadata is attached. The tau2 official adapter maps normalized task ids to upstream domain/task ids, builds guarded `tau2 run` agent/evaluator commands, and parses tau2 `results.json` reward metadata into AEB harness results.
 
 ## Quick start
 
@@ -112,7 +112,44 @@ PYTHONPATH= uv run aeb serve --host 127.0.0.1 --port 8000
 PYTHONPATH= uv run aeb-api
 ```
 
-Open `http://127.0.0.1:8000/` to select models, scaffolds, categories, web-search modes, trials, and suite budgets. The same workflow is available as JSON through endpoints such as `GET /api/catalog`, `GET /api/options`, `POST /api/runs`, `GET /api/runs/{job_id}`, and `GET /api/runs/{job_id}/results`.
+Open `http://127.0.0.1:8000/` to select models, scaffolds, categories, web-search modes, trials, and suite budgets. The dashboard also exposes a `tau2-official` scaffold; use it with category `tool_workflow` to run tau2 tasks through the guarded official tau2 agent/evaluator path. The same workflow is available as JSON through endpoints such as `GET /api/catalog`, `GET /api/options`, `POST /api/runs`, `GET /api/runs/{job_id}`, and `GET /api/runs/{job_id}/results`.
+
+### Installing the tau2 CLI for official tau2 runs
+
+The `tau2-official` scaffold shells out to the upstream `tau2` command. Install and verify the tau2-bench CLI before running `tau2-official` from the dashboard or API:
+
+```bash
+# In a sibling checkout or another stable local path:
+git clone https://github.com/sierra-research/tau2-bench ../tau2-bench
+cd ../tau2-bench
+uv sync
+uv run tau2 check-data
+```
+
+Make the `tau2` executable visible in the same shell where you launch Agent Efficiency Bench. On Windows Git Bash:
+
+```bash
+export PATH="/c/Users/aholm/source/repos/tau2-bench/.venv/Scripts:$PATH"
+```
+
+On macOS/Linux:
+
+```bash
+export PATH="/path/to/tau2-bench/.venv/bin:$PATH"
+```
+
+Then return to this repository and verify that AEB can see the CLI:
+
+```bash
+cd /path/to/agent-efficiency-bench
+tau2 --help
+PYTHONPATH= uv run aeb run-tau2-official \
+  --task-id tau2_bench_retail__55 \
+  --model openai/gpt-5.4-nano \
+  --output-dir runs/tau2-official-smoke
+```
+
+The final command is a dry run by default. It should print a planned `tau2 run ...` command with `"ready": true` once the CLI is on `PATH`. Actual execution requires `--execute` and can spend model tokens for both the tau2 agent LLM and user-simulator LLM. Configure the provider API keys expected by tau2-bench in its `.env` before executing official runs. AEB forces UTF-8/no-color settings for tau2 subprocesses on Windows; if you invoke `tau2 run` directly and see a `UnicodeEncodeError` from Rich/colorama on characters such as `→`, run it from a UTF-8 shell or prefix the command with `PYTHONUTF8=1 PYTHONIOENCODING=utf-8 NO_COLOR=1`.
 
 Generate a report:
 

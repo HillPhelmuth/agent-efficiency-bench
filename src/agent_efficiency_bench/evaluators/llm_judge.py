@@ -33,7 +33,7 @@ class OpenRouterLLMJudge:
         self,
         model: str | None = None,
         client: OpenRouterClient | None = None,
-        max_completion_tokens: int = 1256,
+        max_completion_tokens: int = 2048,
     ):
         self.model = model or os.getenv("AEB_LLM_JUDGE_MODEL", DEFAULT_JUDGE_MODEL)
         self.client = client or OpenRouterClient()

@@ -69,13 +69,14 @@
         <input id="f-n_trials" name="n_trials" type="hidden" value="1" />
         <div class="field">
           <label for="f-max_completion_tokens">Max completion tokens</label>
-          <input id="f-max_completion_tokens" name="max_completion_tokens" type="number" min="1" value="256" />
+          <input id="f-max_completion_tokens" name="max_completion_tokens" type="number" min="1" value="2048" />
         </div>
         <fieldset class="field">
           <legend>Scaffolds</legend>
           <div class="checkbox-group">
             <label class="chip"><input type="checkbox" name="scaffolds" value="answer-only" checked /> answer-only</label>
             <label class="chip"><input type="checkbox" name="scaffolds" value="react-tool-loop" /> react-tool-loop</label>
+            <label class="chip"><input type="checkbox" name="scaffolds" value="tau2-official" /> tau2-official</label>
           </div>
         </fieldset>
         <fieldset class="field">
@@ -89,6 +90,36 @@
           <label for="f-group_by">Group charts by <span class="hint">(comma separated)</span></label>
           <input id="f-group_by" name="group_by" value="category,model,scaffold" />
         </div>
+        <details class="field span-2 tau2-options">
+          <summary>tau2 official options</summary>
+          <div class="nested-grid">
+            <div class="field">
+              <label for="f-tau2_agent">tau2 agent</label>
+              <input id="f-tau2_agent" name="tau2_agent" value="llm_agent" />
+            </div>
+            <div class="field">
+              <label for="f-tau2_user">tau2 user simulator</label>
+              <input id="f-tau2_user" name="tau2_user" value="user_simulator" />
+            </div>
+            <div class="field">
+              <label for="f-tau2_user_model">User model <span class="hint">(blank = same as model)</span></label>
+              <input id="f-tau2_user_model" name="tau2_user_model" placeholder="openai/gpt-5.4-mini" />
+            </div>
+            <div class="field">
+              <label for="f-tau2_num_trials">tau2 trials</label>
+              <input id="f-tau2_num_trials" name="tau2_num_trials" type="number" min="1" value="1" />
+            </div>
+            <div class="field">
+              <label for="f-tau2_max_steps">Max tau2 steps</label>
+              <input id="f-tau2_max_steps" name="tau2_max_steps" type="number" min="1" placeholder="200" />
+            </div>
+            <div class="field">
+              <label for="f-tau2_seed">tau2 seed</label>
+              <input id="f-tau2_seed" name="tau2_seed" type="number" placeholder="300" />
+            </div>
+          </div>
+          <p class="hint-block">Use category <code>tool_workflow</code> with <code>tau2-official</code>. Execution requires the upstream <code>tau2</code> CLI and may spend tokens for both agent and user models.</p>
+        </details>
         <div class="field-row span-2">
           <label class="chip"><input type="checkbox" name="dry_run" /> Dry run only</label>
           <button type="submit" class="btn btn-primary" id="submit-btn">Start run</button>
@@ -139,10 +170,10 @@
       </div>
       <div class="metric-cards" id="metric-cards"></div>
       <div class="charts">
-        <div class="chart-card"><h3>Success rate</h3><canvas id="success-chart"></canvas></div>
-        <div class="chart-card"><h3>Total cost (USD)</h3><canvas id="cost-chart"></canvas></div>
-        <div class="chart-card"><h3>p50 latency (seconds)</h3><canvas id="latency-chart"></canvas></div>
-        <div class="chart-card"><h3>Total tokens</h3><canvas id="tokens-chart"></canvas></div>
+        <div class="chart-card"><h3>Success rate</h3><div class="chart-canvas"><canvas id="success-chart"></canvas></div></div>
+        <div class="chart-card"><h3>Total cost (USD)</h3><div class="chart-canvas"><canvas id="cost-chart"></canvas></div></div>
+        <div class="chart-card"><h3>p50 latency (seconds)</h3><div class="chart-canvas"><canvas id="latency-chart"></canvas></div></div>
+        <div class="chart-card"><h3>Total tokens</h3><div class="chart-canvas"><canvas id="tokens-chart"></canvas></div></div>
       </div>
       <div class="table-wrap">
         <h3>Summary table</h3>

@@ -629,3 +629,75 @@ Root cause for AssistantBench false confidence: the public AssistantBench files 
 Existing deterministic structured evaluation remains available for custom/non-AssistantBench structured tasks, including numeric checks, required domains, and exact citation extraction. Tests that specifically validate provider citation propagation were moved to a custom structured source so they continue testing that deterministic path without reintroducing stale AssistantBench string matching.
 
 Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_api.py::test_api_treats_legacy_trials_field_as_task_count_for_ui_requests tests/test_llm_judge_evaluator.py tests/test_assistantbench_harness.py -q` (`7 passed`), `PYTHONPATH= uv run python -m pytest tests/test_api.py::test_api_chart_summary_does_not_rejudge_stored_llm_evaluations -q` (`1 passed`), and full suite `PYTHONPATH= uv run python -m pytest -q` (`121 passed`, one FastAPI/httpx deprecation warning).
+
+---
+
+## [x] Task 16: Create the tau2-bench agent and evaluator harnesses
+
+### Acceptance Criteria
+
+- [x] tau2 normalized task ids map to upstream tau2 domain/task ids.
+- [x] The tau2 harness builds an official `tau2 run` command for the agent and user simulator.
+- [x] The dry-run path validates whether the `tau2` CLI is installed and prints the planned command without executing it.
+- [x] The execute path remains guarded behind `--execute` and can parse tau2 `results.json` reward metadata when available.
+- [x] The evaluator path converts official tau2 reward/action metadata into common AEB `harness_result` fields.
+- [x] CLI options expose agent, user, user model, trial, step, seed, save, and result parsing controls.
+- [x] Regression tests and the full suite pass.
+
+### Detailed Technical Instructions
+
+1. Inspect the existing partial tau2 adapter in `src/agent_efficiency_bench/harnesses/tau2_bench.py` and its tests.
+2. Confirm the current upstream tau2 command surface from the tau2-bench docs.
+3. Replace the placeholder runner-module command with a guarded `tau2 run` command builder.
+4. Keep dry-run behavior safe and non-spending.
+5. Extend result parsing so tau2 monolithic `results.json` simulation reward metadata can be converted to AEB quality/success metadata.
+6. Expose the relevant command options through `aeb run-tau2-official`.
+7. Update README/running docs and verify targeted plus full tests.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/harnesses/tau2_bench.py`, `src/agent_efficiency_bench/cli.py`, `tests/test_tau2_bench_harness.py`, `tests/test_cli.py`, `README.md`, and `docs/running-benchmarks.md`.
+
+The tau2 adapter now builds official upstream CLI invocations with `tau2 run --domain <domain> --agent <agent> --user <user> --agent-llm <model> --user-llm <model> --task-ids <id> --num-trials <n> --save-to <name>`. It accepts optional agent/user LLM args, max steps/errors/concurrency, seed, task split/set, verbose logs, and auto-resume controls. Dry runs check for the `tau2` CLI and return the full planned command; execution is still guarded by `--execute`.
+
+The evaluator harness now parses both the legacy flat test shape and official tau2 monolithic `results.json` files. For official results it selects the requested simulation, reads `reward_info.reward` for success and Likert quality conversion, extracts partial action counts from `partial_action_reward`, and preserves reward breakdown, cost, duration, termination reason, and harness identity in `details` so `OfficialHarnessResultEvaluator` can score tau2 tasks from attached harness metadata.
+
+The CLI `run-tau2-official` now exposes agent/user/user-model/trial/step/seed/save/result-path options instead of requiring a placeholder runner module. Documentation now states that tau2 execution uses the upstream `tau2 run` command and may spend real model tokens through both the agent LLM and user simulator.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_tau2_bench_harness.py tests/test_cli.py tests/test_evaluators.py -q` (`32 passed`), full suite `PYTHONPATH= uv run python -m pytest -q` (`124 passed`, one FastAPI/httpx deprecation warning), and a dry-run smoke command `PYTHONPATH= uv run aeb run-tau2-official --task-id tau2_bench_retail__55 --model openai/gpt-5.4-nano --output-dir runs/tau2-official-smoke`, which printed a `tau2 run` command and `ready: false` because the `tau2` CLI is not installed in this environment.
+
+---
+
+## [x] Task 17: Wire tau2-official harness runs into the Web interface
+
+### Acceptance Criteria
+
+- [x] `/api/options` advertises `tau2-official` as a scaffold.
+- [x] The dashboard can submit a `tau2-official` run request with `tool_workflow` category.
+- [x] The API passes tau2 agent/user/user-model/trial/step/seed options through to the official tau2 harness adapter.
+- [x] Successful tau2 harness results write `run_results.jsonl` and `run_telemetry.jsonl` so the dashboard results endpoint can render charts/tables.
+- [x] The UI exposes tau2-specific options and warns that execution requires the `tau2` CLI and may spend tokens.
+- [x] Regression tests and browser/API smoke checks pass.
+
+### Detailed Technical Instructions
+
+1. Trace dashboard request payloads through `src/agent_efficiency_bench/web/app.js`, `RunRequest`, `expand_run_request()`, and `execute_benchmark_combination()`.
+2. Add `tau2-official` as a supported scaffold without changing the existing answer-only/tool-loop paths.
+3. Add API request/combination fields for tau2-specific agent/evaluator options.
+4. When a tau2-official combination executes, select normalized tau2 tasks, call `run_tau2_task(...)`, attach parsed output as `harness_result`, evaluate via `RegistryEvaluator`, and persist standard run result/telemetry JSONL files.
+5. Add dashboard controls for tau2 agent/user options and include them in the JSON payload only when the tau2 scaffold is selected.
+6. Verify through API tests, full tests, and a live dashboard/API dry-run smoke.
+
+### Implementation Details
+
+Implemented in `src/agent_efficiency_bench/api.py`, `src/agent_efficiency_bench/web/index.html`, `src/agent_efficiency_bench/web/app.js`, `src/agent_efficiency_bench/web/styles.css`, `tests/test_api.py`, and `README.md`.
+
+The API now accepts `tau2-official` in scaffold combinations and routes those combinations to a new `execute_tau2_official_combination(...)` path. That path filters for normalized tau2 tasks, runs the guarded tau2 harness adapter, stores parsed tau2 reward metadata as `output.harness_result`, evaluates it through the existing official-harness evaluator, writes a simple trace, and persists `run_results.jsonl` plus `run_telemetry.jsonl` for dashboard summaries.
+
+The dashboard now includes a `tau2-official` scaffold checkbox and a collapsible tau2 options panel for `tau2_agent`, `tau2_user`, `tau2_user_model`, `tau2_num_trials`, `tau2_max_steps`, and `tau2_seed`. The request payload includes these fields only when `tau2-official` is selected. The options sidebar now lists `tau2-official` because `/api/options` advertises it.
+
+Verification completed with `PYTHONPATH= uv run python -m pytest tests/test_api.py tests/test_cli.py tests/test_tau2_bench_harness.py -q` (`34 passed`, one FastAPI/httpx warning), full suite `PYTHONPATH= uv run python -m pytest -q` (`126 passed`, one FastAPI/httpx warning), a live browser dry-run submission for category `tool_workflow` + scaffold `tau2-official`, and a direct API dry-run smoke against `POST /api/runs` that returned a `tau2-official` combination carrying the requested tau2 user model/trial/step options.
+
+Follow-up: the tau2 subprocess environment now force-overrides Windows-unfriendly parent values (`PYTHONUTF8=1`, `PYTHONIOENCODING=utf-8`, `NO_COLOR=1`, `TERM=dumb`, and related flags) instead of using `setdefault`, because a parent shell/API server can otherwise preserve `cp1252` output settings and let Rich/colorama crash on Unicode glyphs like `→`. The trace payload also records safe `subprocess_env_overrides` values so future Web runs can confirm the child process received the UTF-8/no-color configuration.
+
+Follow-up: tau2 writes CLI results to its own `DATA_DIR/simulations/<save-to>/results.json`, not to AEB's requested artifact directory. The harness now resolves that upstream location from `TAU2_DATA_DIR`, tau2 stderr, or the tau2 executable checkout, copies the resolved `results.json` back into the AEB artifact directory, and parses all trials for the requested task. Parsed tau2 metadata now includes mean reward, pass rate, simulation count, aggregate action counts, aggregate cost, and aggregate duration so the Web dashboard no longer treats successful tau2 CLI exits as unparsed failures.

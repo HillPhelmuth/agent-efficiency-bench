@@ -129,7 +129,7 @@ uv run tau2 check-data
 Make the `tau2` executable visible in the same shell where you launch Agent Efficiency Bench. On Windows Git Bash:
 
 ```bash
-export PATH="/c/Users/aholm/source/repos/tau2-bench/.venv/Scripts:$PATH"
+export PATH="/c/Users/<user-to-repos>/repos/tau2-bench/.venv/Scripts:$PATH"
 ```
 
 On macOS/Linux:
